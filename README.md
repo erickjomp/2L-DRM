@@ -7,10 +7,20 @@ Then you can clone this repository in a local directory:
 
     clone https://github.com/erickjomp/2L-DRM.git
 
-And you can build and compile the 2L-DRM program using:
+And you can build the 2L-DRM program using:
 
     fpm build
 
+And install it using:
+
     fpm install
+
+In addition, if using a Linux system, you may want to add the `~/.local/bin/` to your PATH environment. For that, you can edit your `~/.profile` file by adding a line like this:
+
+   export PATH=~/.local/bin/:$PATH
+
+Then you will be able to call the program `run2LDRM` from any directory. For a list of the required and optional inputs of this program, please use:
+
+   run2LDRM --help
 
 
