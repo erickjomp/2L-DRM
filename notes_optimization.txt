@@ -1,0 +1,10 @@
+akways check performance comparison vs using static arrays 
+see comparison tests in 
+/data/keeling/a/erickkc2/f/SAAG2/testSAAG3_4km_origmodel_copy    for static array
+/data/keeling/a/erickkc2/f/SAAG2/testSAAG3_4km_origmodel_copy2   for dynamic arrays (i.e. using allocatables)
+
+These test cases need to be improved to habe both equal conditions, test 1 seems to be computing like 20 less days and reading 1 less set of files.
+But these tests can give an idea of speed.
+
+Avoid compiling with checking at runtime for copiling final exceutables, it slows the exexution. We dont have to see runtime warning or some like that when running
+But for debugging is useful.

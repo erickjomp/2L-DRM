@@ -1,0 +1,19 @@
+name = "run2LDRM"
+version = "0.1.0"
+license = "license"
+author = "Jane Doe"
+maintainer = "jane.doe@example.com"
+copyright = "Copyright 2024, Jane Doe"
+[build]
+auto-executables = true
+auto-tests = true
+auto-examples = true
+module-naming = false
+[install]
+library = false
+[fortran]
+implicit-typing = false
+implicit-external = false
+source-form = "free"
+[dependencies]
+FLAP = { git="https://github.com/szaghi/FLAP.git" }
