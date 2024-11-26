@@ -34,4 +34,4 @@ Then you will be able to call the program `run2LDRM` from any directory. For a l
 
 ## Notes
 - The data in the input binary files of run2LDRM program should be in Fortran-like memory order (read more about it here https://manik.cc/2021/02/25/memory-order.html). As a rule of thumb, if you want an input binary file with dimensions (nx, ny, 2, ndays) and you are going to write it from a Python numpy array, the numpy array must have dimensions (ndays, 2, ny, nx).
-- The precipitable water flux at the interslab (PWflux), which has to be provided as an input binary file, can be calculated by $\rho_{air} w_{wind} q$, where $\rho_{air}$ is the density of the air, w_{wind} is the vertical wind velocity and $q$ is the specific humidity at the interslab pressure level.
+- The precipitable water flux at the interslab (PWflux), which has to be provided as an input binary file, can be calculated by $\rho_{air} w_{wind} q$, where $\rho_{air}$ is the density of the air, $w_{wind}$ is the vertical wind velocity and $q$ is the specific humidity at the interslab pressure level.
