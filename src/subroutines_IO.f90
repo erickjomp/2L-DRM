@@ -35,7 +35,8 @@ contains
         ! delta_write_paths = 6
         ! ij0_write_paths = 3
 
-        call cli%init(description = 'Program that runs the 2LDRM model')
+        call cli%init(description = 'Program that runs the 2LDRM model. Instead of just providing one binary file per variable &
+                        &(default), you can provide multiple binay files per variable by activating the option --listfiles .')
         call cli%add(switch='--pathin', &
             switch_ab='-pi',    &
             help='Path inputs. Optional. Not necessary if you will specific the complete path of all the other input files.',   &
@@ -59,7 +60,8 @@ contains
 
         call cli%add(switch='--fileET', &
                     switch_ab='-ET',    &
-                    help='Text file containing the list of Evapotranspiration (ET) binary files to read. &
+                    ! help='Text file containing the list of Evapotranspiration (ET) binary files to read. &
+                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, 2, ,ndays).  &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
                     act='store',       &
@@ -68,7 +70,8 @@ contains
 
         call cli%add(switch='--filePP', &
                     switch_ab='-PP',    &
-                    help='Text file containing the list of Precipitation (PP) binary files to read. &
+                    ! help='Text file containing the list of Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, ndays). &
+                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, ndays). &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
                     act='store',       &
@@ -78,7 +81,8 @@ contains
 
         call cli%add(switch='--filePW', &
                     switch_ab='-PW',    &
-                    help='Text file containing the list of Precipitable Water (PW) binary files.&
+                    ! help='Text file containing the list of Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, ndays). &
+                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, ndays). &
                             &Data at daily time step. Units of mm',   &
                     required=.true.,   &
                     act='store',       &
@@ -88,7 +92,8 @@ contains
 
         call cli%add(switch='--fileU', &
                     switch_ab='-U',    &
-                    help='Text file containing the list of vapor weighted wind speed U (U) binary files to read. &
+                    ! help='Text file containing the list of vapor weighted wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
+                    help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
                             &Data at velocity_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
@@ -97,7 +102,8 @@ contains
 
         call cli%add(switch='--fileV', &
                     switch_ab='-V',    &
-                    help='Text file containing the list of vapor weighted wind speed V (V) binary files to read. &
+                    ! help='Text file containing the list of vapor weighted wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
+                    help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
                             &Data at velocity_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
@@ -107,8 +113,9 @@ contains
 
         call cli%add(switch='--filePWflux', &
                     switch_ab='-PWf',    &
-                    help='Text file containing the list of PW flux between slabs (PWflux) binary files to read.&
-                            &Data at daily time step. Units of mm/day.',   &
+                    ! help='Text file containing the list of PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,ndays).&
+                    help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,ndays).&
+                            &Data at daily time step. Units of mm/day. ',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
