@@ -62,7 +62,8 @@ contains
         call cli%add(switch='--fileET', &
                     switch_ab='-ET',    &
                     ! help='Text file containing the list of Evapotranspiration (ET) binary files to read. &
-                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, nslabs, ,ndays) with nslabs = 2.  &
+                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, nslabs, ndays)&
+                            & with nslabs = 2.  &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
                     act='store',       &
@@ -72,7 +73,8 @@ contains
         call cli%add(switch='--filePP', &
                     switch_ab='-PP',    &
                     ! help='Text file containing the list of Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, ndays). &
-                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, nslabs, ndays) with nslabs = 2. &
+                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, nslabs, ndays) &
+                            & with nslabs = 2. &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
                     act='store',       &
@@ -83,7 +85,8 @@ contains
         call cli%add(switch='--filePW', &
                     switch_ab='-PW',    &
                     ! help='Text file containing the list of Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, ndays). &
-                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, nslabs, ndays) with nslabs = 2. &
+                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, nslabs, ndays) &
+                            &with nslabs = 2. &
                             &Data at daily time step. Units of mm',   &
                     required=.true.,   &
                     act='store',       &
@@ -94,7 +97,8 @@ contains
         call cli%add(switch='--fileU', &
                     switch_ab='-U',    &
                     ! help='Text file containing the list of vapor weighted wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
-                    help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, nslabs, ,n_timesteps) with nslabs = 2. &
+                    help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_timesteps)&
+                            & with nslabs = 2. &
                             &Data at velocity_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
@@ -104,7 +108,8 @@ contains
         call cli%add(switch='--fileV', &
                     switch_ab='-V',    &
                     ! help='Text file containing the list of vapor weighted wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
-                    help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, nslabs, ,n_timesteps) with nslabs = 2. &
+                    help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_timesteps)&
+                            & with nslabs = 2. &
                             &Data at velocity_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
@@ -115,7 +120,8 @@ contains
         call cli%add(switch='--filePWflux', &
                     switch_ab='-PWf',    &
                     ! help='Text file containing the list of PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,ndays).&
-                    help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, nslabs, ,ndays) with nslabs = 2.&
+                    help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions &
+                            & (nx, ny, n_interslabs, ndays) with n_interslabs = 1.&
                             &Data at daily time step. Units of mm/day. ',   &
                     required=.true.,   &
                     act='store',       &
