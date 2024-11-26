@@ -1,6 +1,6 @@
 # run2LDRM
 
-![2L-DRM trajectories for a specific day](trajectories_example.png "2L-DRM trajectores for a specific day") 
+![2L-DRM trajectories for a specific day](trajectories_example.png =100x20) 
 
 This repository contains the CLI program of the moisture tracking model 2L-DRM. The theoretical details of the 2L-DRM model can be found in https://doi.org/10.1175/JHM-D-19-0101.1. To build and compile it, you need to have the following installed:
 1. A Fortran compiler that supports the module ieee_arithmetic is required (any compiler that implements the Fortran 2003 standard or higher would be fine). I did it with the GNU/GCC 9.3.0 compiler.
