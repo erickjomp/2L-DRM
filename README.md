@@ -8,7 +8,7 @@
 
 
 This repository contains the CLI program of the moisture tracking model 2L-DRM. The theoretical details of the 2L-DRM model can be found in https://doi.org/10.1175/JHM-D-19-0101.1. To build and compile it, you need to have the following installed:
-1. A Fortran compiler that supports the module ieee_arithmetic is required (any compiler that implements the Fortran 2003 standard or higher would be fine). I did it with the GNU/GCC 9.3.0 compiler.
+1. A Fortran compiler that supports the module ieee_arithmetic is required (any compiler that implements the Fortran 2003 standard or higher would be fine). I did it with the compiler included in GNU/GCC 9.3.0. 
 2. Fortran Package Manager (fpm). See intructions for installing it here: https://github.com/fortran-lang/fpm. I installed it using a conda environment.
 
 Then you can clone this repository in a local directory: 
@@ -32,5 +32,6 @@ Then you will be able to call the program `run2LDRM` from any directory. For a l
     run2LDRM --help
 
 
-## Note:
-The data in the input binary files of run2LDRM program should be in Fortran-like memory order (read more about it here https://manik.cc/2021/02/25/memory-order.html). As a rule of thumb, if you want an input binary file with dimensions (nx, ny, 2, ndays) and you are going to write it from a Python numpy array, the numpy array must have dimensions (ndays, 2, ny, nx).
+## Notes
+- The data in the input binary files of run2LDRM program should be in Fortran-like memory order (read more about it here https://manik.cc/2021/02/25/memory-order.html). As a rule of thumb, if you want an input binary file with dimensions (nx, ny, 2, ndays) and you are going to write it from a Python numpy array, the numpy array must have dimensions (ndays, 2, ny, nx).
+- The precipitable water flux at the interslab (PWflux), which has to be provided as an input binary file, can be calculated by $\rho_{air} w_{wind} PW$, where $\rho_{air}$ is the density of the air, w_{wind} is the vertical wind velocity and $PW$ is the precipitable water at the interslab pressure level.

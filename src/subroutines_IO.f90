@@ -36,7 +36,8 @@ contains
         ! ij0_write_paths = 3
 
         call cli%init(description = 'Program that runs the 2LDRM model. Instead of just providing one binary file per variable &
-                        &(default), you can provide multiple binay files per variable by activating the option --listfiles .')
+                        &(default), you can provide multiple binay files per variable by activating the option --listfiles. &
+                        &All the binary files should contain data with 4-bytes real numbers (float32).')
         call cli%add(switch='--pathin', &
             switch_ab='-pi',    &
             help='Path inputs. Optional. Not necessary if you will specific the complete path of all the other input files.',   &
@@ -61,7 +62,7 @@ contains
         call cli%add(switch='--fileET', &
                     switch_ab='-ET',    &
                     ! help='Text file containing the list of Evapotranspiration (ET) binary files to read. &
-                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, 2, ,ndays).  &
+                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, nslabs, ,ndays) with nslabs = 2.  &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
                     act='store',       &
@@ -71,7 +72,7 @@ contains
         call cli%add(switch='--filePP', &
                     switch_ab='-PP',    &
                     ! help='Text file containing the list of Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, ndays). &
-                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, ndays). &
+                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, nslabs, ndays) with nslabs = 2. &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
                     act='store',       &
@@ -82,7 +83,7 @@ contains
         call cli%add(switch='--filePW', &
                     switch_ab='-PW',    &
                     ! help='Text file containing the list of Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, ndays). &
-                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, ndays). &
+                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, nslabs, ndays) with nslabs = 2. &
                             &Data at daily time step. Units of mm',   &
                     required=.true.,   &
                     act='store',       &
@@ -93,7 +94,7 @@ contains
         call cli%add(switch='--fileU', &
                     switch_ab='-U',    &
                     ! help='Text file containing the list of vapor weighted wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
-                    help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
+                    help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, nslabs, ,n_timesteps) with nslabs = 2. &
                             &Data at velocity_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
@@ -103,7 +104,7 @@ contains
         call cli%add(switch='--fileV', &
                     switch_ab='-V',    &
                     ! help='Text file containing the list of vapor weighted wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
-                    help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
+                    help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, nslabs, ,n_timesteps) with nslabs = 2. &
                             &Data at velocity_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
@@ -114,7 +115,7 @@ contains
         call cli%add(switch='--filePWflux', &
                     switch_ab='-PWf',    &
                     ! help='Text file containing the list of PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,ndays).&
-                    help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,ndays).&
+                    help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, nslabs, ,ndays) with nslabs = 2.&
                             &Data at daily time step. Units of mm/day. ',   &
                     required=.true.,   &
                     act='store',       &
@@ -124,7 +125,8 @@ contains
 
         call cli%add(switch='--regions', &
                     switch_ab='-reg',    &
-                    help='Binary file containing the the moisture source regions to analyze.',   &
+                    help='Binary file containing the mask of the source regions to analyze. The dimennsions must be (nx, ny). &
+                    &Each region must be represented by a different integer number starting by 1.0 . ',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -132,7 +134,9 @@ contains
 
         call cli%add(switch='--topomask', &
                     switch_ab='-mask',    &
-                    help='Binary file containing the topography mask for interslabs.',   &
+                    help='Binary file containing the topography mask for interslabs. The dimennsions must be (nx, ny). &
+                    &The value is 1.0 for grid cells where the surface is below the interslab pressure level and 0.0 otherwise. &
+                    &This is useful for mountainous regions. If the topography is flat, all the values will be 1.0. ',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -140,7 +144,8 @@ contains
 
         call cli%add(switch='--itarget', &
                     switch_ab='-it',    &
-                    help='Binary file of i grid values of target region',   &
+                    help='Binary file of i grid values of target region. This a unidimensional array with &
+                    &length equal to the number of grid cells in target region.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -148,7 +153,8 @@ contains
 
         call cli%add(switch='--jtarget', &
                     switch_ab='-jt',    &
-                    help='Binary file of j grid values of target region',   &
+                    help='Binary file of j grid values of target region. This a unidimensional array with &
+                    &length equal to the number of grid cells in target region.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
