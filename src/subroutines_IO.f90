@@ -7,18 +7,20 @@ contains
     subroutine read_global_data()
         use global_data
         use FLAP
+        use datetime_module
 
         type(command_line_interface)                 :: cli    ! Command Line Interface (CLI).
-        integer                                      :: error_cli  
+        integer                                      :: error_cli
+        character(len=19)                            :: datetime0_str  
 
         ! bigx=1471 !253 ! 1471 !1471  !number of grids in x and y direction
         ! bigy=2027 !346 ! 2027 ! 2027
-        ! ndays= 488 !196 ! 120+15 months-01to04 no leapyear ! 123+15  months-05to08  ! 122+15  months-09to12   ! CHANGE ! it seems it no longer affects
+        ! n_datadt= 488 !196 ! 120+15 months-01to04 no leapyear ! 123+15  months-05to08  ! 122+15  months-09to12   ! CHANGE ! it seems it no longer affects
         ! dx=4000.00  !unit(m), the distance of each grid
         ! dy=4000.00
         ! !__________________________starting dates and ending dates,core region
-        ! day1=16
-        ! day2= 488 !196  !123+15  !day1=16, day2=   !date starts and ends simulation
+        ! t_data_start=16
+        ! t_data_end= 488 !196  !123+15  !t_data_start=16, t_data_end=   !date starts and ends simulation
         ! domsize=49509  !1386 nonCPM  !49509 CPM !49509  !number of grids within the monsoon region
         ! nregions = 8  ! 83148 cells landocean CPM  ! 31774 cells land CPM ! 8    !number of regions in map file    ! CHANGE 
         ! !______________________________________________________________________
@@ -27,8 +29,8 @@ contains
         ! option_next_point = 1 ! 1 for iterative method, and 2 for direct method
         ! max_iteration=101 ! maximum times of iteration
         ! tol_error_iteration = 0.0001 
-        ! ! integer, save :: ndays_warmup = 15 !days that to be excluded at the beginning    ! CHANGE 
-        ! velocity_dt = 3 
+        ! ! integer, save :: n_datadt_warmup = 15 !days that to be excluded at the beginning    ! CHANGE 
+        ! UV_dt = 3 
         ! verbose = .true.
         ! write_paths = .true.
         ! step_write_paths =  12
@@ -62,7 +64,7 @@ contains
         call cli%add(switch='--fileET', &
                     switch_ab='-ET',    &
                     ! help='Text file containing the list of Evapotranspiration (ET) binary files to read. &
-                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, nslabs, ndays)&
+                    help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, nslabs, n_datadt)&
                             & with nslabs = 2.  &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
@@ -72,8 +74,8 @@ contains
 
         call cli%add(switch='--filePP', &
                     switch_ab='-PP',    &
-                    ! help='Text file containing the list of Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, ndays). &
-                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, nslabs, ndays) &
+                    ! help='Text file containing the list of Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, 2, n_datadt). &
+                    help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_datadt) &
                             & with nslabs = 2. &
                             &Data at daily time step. Units of mm.',   &
                     required=.true.,   &
@@ -84,8 +86,8 @@ contains
 
         call cli%add(switch='--filePW', &
                     switch_ab='-PW',    &
-                    ! help='Text file containing the list of Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, ndays). &
-                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, nslabs, ndays) &
+                    ! help='Text file containing the list of Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, 2, n_datadt). &
+                    help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, nslabs, n_datadt) &
                             &with nslabs = 2. &
                             &Data at daily time step. Units of mm',   &
                     required=.true.,   &
@@ -99,7 +101,7 @@ contains
                     ! help='Text file containing the list of vapor weighted wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
                     help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_timesteps)&
                             & with nslabs = 2. &
-                            &Data at velocity_dt time step. Units of m/s.',   &
+                            &Data at UV_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -110,7 +112,7 @@ contains
                     ! help='Text file containing the list of vapor weighted wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_timesteps). &
                     help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_timesteps)&
                             & with nslabs = 2. &
-                            &Data at velocity_dt time step. Units of m/s.',   &
+                            &Data at UV_dt time step. Units of m/s.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -119,9 +121,9 @@ contains
 
         call cli%add(switch='--filePWflux', &
                     switch_ab='-PWf',    &
-                    ! help='Text file containing the list of PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,ndays).&
+                    ! help='Text file containing the list of PW flux between slabs (PWflux) binary files to read. The data has to have dimensions (nx, ny, 2, ,n_datadt).&
                     help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions &
-                            & (nx, ny, n_interslabs, ndays) with n_interslabs = 1.&
+                            & (nx, ny, n_interslabs, n_datadt) with n_interslabs = 1.&
                             &Data at daily time step. Units of mm/day. ',   &
                     required=.true.,   &
                     act='store',       &
@@ -199,9 +201,9 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
-        call cli%add(switch='--ndays', &
-                    switch_ab='-nd',    &
-                    help='Number of days in data',   &
+        call cli%add(switch='--n_datadt', &
+                    switch_ab='-nt',    &
+                    help='Number of time steps data_dt in data',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -223,21 +225,31 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
-        call cli%add(switch='--day1', &
-                    switch_ab='-d1',    &
+        call cli%add(switch='--t_data_start', &
+                    switch_ab='-t1',    &
                     help='Day 1 of analysis. Since there should be some days for backtracing, it cant be 1.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop   
 
-        call cli%add(switch='--day2', &
-                    switch_ab='-d2',    &
+        call cli%add(switch='--t_data_end', &
+                    switch_ab='-t2',    &
                     help='Final day of analysis. Optional, if not provided, it will be the total number of days',   &
                     required=.false.,   &
                     act='store',       &
                     def='0',           &
                     error=error_cli)
+        if (error_cli/=0) stop   
+
+        call cli%add(switch='--datetime0', &
+                switch_ab='-d0',    &
+                help='Initial datetime of data. Optional. Used for labelling outputs with datetimes. &
+                      &Format example: 2018-06-14_00:00:00 ',   &
+                required=.true.,   &
+                act='store',       &
+                def='0',           &
+                error=error_cli)
         if (error_cli/=0) stop   
 
         call cli%add(switch='--domsize', &
@@ -259,7 +271,7 @@ contains
 
         call cli%add(switch='--tracing_dt', &
                     switch_ab='-tdt',    &
-                    help='Time interval of each-time back tracing. In seconds. Should exactly divide velocity_dt.',   &
+                    help='Time interval of each-time back tracing. In seconds. Should exactly divide UV_dt * 60  * 60.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -293,6 +305,15 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
+        call cli%add(switch='--solver', &
+                switch_ab='-s',    &
+                help='Enter 1 to solve differential equation analitically or 2 for solving with finite diferences. ',   &
+                required=.false.,   &
+                act='store',       &
+                def = '1',       &
+                error=error_cli)
+        if (error_cli/=0) stop   
+
 
         call cli%add(switch='--maxtol', &
                     switch_ab='-tol',    &
@@ -303,13 +324,23 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
-        call cli%add(switch='--velocity_dt', &
-                    switch_ab='-vdt',    &
-                    help='Wind speed dt. In hours. Must be a divisor of the number of 24 (number of hours in day)',   &
+        call cli%add(switch='--data_dt', &
+                    switch_ab='-ddt',    &
+                    help='PP, PW, ET dt. In hours',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop   
+
+        call cli%add(switch='--UV_dt', &
+                    switch_ab='-udt',    &
+                    help='Optional. Wind speed dt. In hours. Must be a divisor of data_dt (in hours)',   &
+                    required=.false.,   &
+                    act='store',       &
+                    def='0',           &
+                    error=error_cli)
+        if (error_cli/=0) stop   
+
 
         call cli%add(switch='--verbose', &
                     switch_ab='-ver',    &
@@ -345,7 +376,7 @@ contains
                 switch_ab='-wpd',    &
                 help='Write paths interval. sometimes writing all the points of paths can generate big files. &
                         & Use this option to only write the backtracing from one point of a&
-                        & squre of wpi x wpi of the target region. Default 1 (i.e. all points)',   &
+                        & squre of wpd x wpd of the target region. Default 1 (i.e. all points)',   &
                 required=.false.,   &
                 act='store',       &
                 def='1',           &
@@ -364,6 +395,42 @@ contains
                 def='1',           &
                 error=error_cli)
         if (error_cli/=0) stop   
+
+
+        ! call cli%add(switch='--writepaths_datetimestart', &
+        !         ! switch_ab='-wp0',    &
+        !         help='Write paths interval. sometimes writing all the paths can generate big files. &
+        !                 & Use this option to only write paths that are traced between &
+        !                 & writepaths_datetimestart and writepaths_datetimeend',   &
+        !         required=.false.,   &
+        !         act='store',       &
+        !         def='1',           &
+        !         error=error_cli)
+        ! if (error_cli/=0) stop   
+
+        ! call cli%add(switch='--writepaths_datetimeend', &
+        !         ! switch_ab='-wp0',    &
+        !         help='Write paths interval. sometimes writing all the paths can generate big files. &
+        !                 & Use this option to only write paths that are traced between &
+        !                 & writepaths_datetimestart and writepaths_datetimeend',   &
+        !         required=.false.,   &
+        !         act='store',       &
+        !         def='1',           &
+        !         error=error_cli)
+        ! if (error_cli/=0) stop   
+
+
+        call cli%add(switch='--writerhocolumn_grid', &
+                switch_ab='-wrc',    &
+                help='Write rho column grid, with dimensions (time, regions, ny, nx). &
+                        & Not recommended when having many regions.', &
+                required=.false.,   &
+                act='store',       &
+                def='.false.',           &
+                error=error_cli)
+        if (error_cli/=0) stop   
+
+
 
         call cli%get(switch='-pi', val=path_input, error=error_cli)
         if (error_cli/=0) stop
@@ -454,18 +521,23 @@ contains
         if (error_cli/=0) stop
         call cli%get(switch='-ny', val=bigy, error=error_cli)
         if (error_cli/=0) stop
-        call cli%get(switch='-nd', val=ndays, error=error_cli)
+        call cli%get(switch='-nt', val=n_datadt, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-dx', val=dx, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-dy', val=dy, error=error_cli)
         if (error_cli/=0) stop
 
-        call cli%get(switch='-d1', val=day1, error=error_cli)
+        call cli%get(switch='-t1', val=t_data_start, error=error_cli)
         if (error_cli/=0) stop
-        call cli%get(switch='-d2', val=day2, error=error_cli)
+        call cli%get(switch='-t2', val=t_data_end, error=error_cli)
         if (error_cli/=0) stop
-        if (day2 == 0)  day2 = ndays
+        if (t_data_end == 0)  t_data_end = n_datadt
+        call cli%get(switch='-d0', val=datetime0_str, error=error_cli)
+        if (error_cli/=0) stop
+        datetime0 = strptime(datetime0_str,"%Y-%m-%d_%H:%M:%S")
+        ! print *, datetime0 % isoformat()
+
         call cli%get(switch='-ds', val=domsize, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-nreg', val=nregions, error=error_cli)
@@ -480,12 +552,19 @@ contains
         if (error_cli/=0) stop
         call cli%get(switch='-mit', val=max_iteration, error=error_cli)
         if (error_cli/=0) stop
+        call cli%get(switch='-s', val=solver, error=error_cli)
+        if (error_cli/=0) stop
         call cli%get(switch='-tol', val=tol_error_iteration, error=error_cli)
         if (error_cli/=0) stop
 
 
-        call cli%get(switch='-vdt', val=velocity_dt, error=error_cli)
+        call cli%get(switch='-ddt', val=data_dt, error=error_cli)
         if (error_cli/=0) stop
+        call cli%get(switch='-udt', val=UV_dt, error=error_cli)
+        if (error_cli/=0) stop
+        if (UV_dt .eq. 0) then
+            UV_dt = data_dt
+        end if
         call cli%get(switch='-ver', val=verbose, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-wp', val=write_paths, error=error_cli)
@@ -496,6 +575,8 @@ contains
         if (error_cli/=0) stop
         call cli%get(switch='-wp0', val=ij0_write_paths, error=error_cli)
         if (error_cli/=0) stop
+        call cli%get(switch='-wrc', val=write_rhocolumn_grid, error=error_cli)
+        if (error_cli/=0) stop
 
 
 
@@ -503,29 +584,29 @@ contains
 
         ! derived variables
         ! calculate number of days
-        n_days_tracing = ceiling(max_tracing * tracing_dt * 1.0 / (60*60*24))
-        n_dt_tracing = ceiling(max_tracing * tracing_dt * 1.0 / (60*60*velocity_dt))
+        n_datadt_tracing = ceiling(max_tracing * tracing_dt * 1.0 / (60*60* data_dt))
+        n_UVdt_tracing = ceiling(max_tracing * tracing_dt * 1.0 / (60*60*UV_dt))
         ! calculte number of dt (dt of velocities)
 
 
         allocate(MASK_TOPO(bigx,bigy,nslabs-1))
         allocate(MAP_REGIONS(bigx, bigy))
-        ! allocate(PP(bigx,bigy,ndays))
-        ! allocate(ET(bigx,bigy,ndays))
-        ! allocate(PW(bigx,bigy,nslabs,ndays))
-        ! allocate(U3(bigx,bigy,nslabs, ndays*24/velocity_dt))
-        ! allocate(V3(bigx,bigy,nslabs, ndays*24/velocity_dt))
+        ! allocate(PP(bigx,bigy,n_datadt))
+        ! allocate(ET(bigx,bigy,n_datadt))
+        ! allocate(PW(bigx,bigy,nslabs,n_datadt))
+        ! allocate(U3(bigx,bigy,nslabs, n_datadt*24/UV_dt))
+        ! allocate(V3(bigx,bigy,nslabs, n_datadt*24/UV_dt))
         allocate(domain_ij(domsize,2))
-        ! allocate(PW_FLUX(bigx,bigy,nslabs-1,ndays))
-        ! allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,ndays))
+        ! allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt))
+        ! allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt))
 
-        allocate(temp_PP(bigx,bigy,n_days_tracing))
-        allocate(temp_ET(bigx,bigy,n_days_tracing))
-        allocate(temp_PW(bigx,bigy,nslabs,n_days_tracing))
-        allocate(temp_U3(bigx,bigy,nslabs,n_dt_tracing ))     
-        allocate(temp_V3(bigx,bigy,nslabs,n_dt_tracing ))
-        allocate(temp_PW_FLUX(bigx,bigy,nslabs-1,n_days_tracing))
-        ! allocate(temp_MASK_PW_FLUX(bigx,bigy,nslabs-1,n_days_tracing))
+        allocate(temp_PP(bigx,bigy,n_datadt_tracing))
+        allocate(temp_ET(bigx,bigy,n_datadt_tracing))
+        allocate(temp_PW(bigx,bigy,nslabs,n_datadt_tracing))
+        allocate(temp_U3(bigx,bigy,nslabs,n_UVdt_tracing ))     
+        allocate(temp_V3(bigx,bigy,nslabs,n_UVdt_tracing ))
+        allocate(temp_PW_FLUX(bigx,bigy,nslabs-1,n_datadt_tracing))
+        ! allocate(temp_MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt_tracing))
 
         !!!! ##########  TEMPORAL ########## !!!!!
         ! file_PP(1)  = trim(path_input) // "2018_months05to08_PP24.dat"
@@ -560,24 +641,30 @@ contains
         ! file_domain_i = trim(path_input) // filename_domain_i
         ! file_domain_j = trim(path_input) // filename_domain_j
         filename_rhodomain_daily = trim(prefix_outfiles) // filename_rhodomain_daily
-        file_rhodomain_daily = trim(path_output) // filename_rhodomain_daily
-        print *, file_rhodomain_daily 
+        file_rhodomain_daily = trim(path_output) // "/" // filename_rhodomain_daily
+        ! print *, file_rhodomain_daily 
 
         filename_rhocolumn_domain_daily = trim(prefix_outfiles) // filename_rhocolumn_domain_daily
-        file_rhocolumn_domain_daily = trim(path_output) // filename_rhocolumn_domain_daily
-        print *, file_rhocolumn_domain_daily
+        file_rhocolumn_domain_daily = trim(path_output) //  "/" // filename_rhocolumn_domain_daily
+        ! print *, file_rhocolumn_domain_daily
 
         filename_rhocolumn_domain_timeavg = trim(prefix_outfiles) // filename_rhocolumn_domain_timeavg
-        file_rhocolumn_domain_timeavg = trim(path_output) // filename_rhocolumn_domain_timeavg
-        print *, file_rhocolumn_domain_timeavg
+        file_rhocolumn_domain_timeavg = trim(path_output) // "/" // filename_rhocolumn_domain_timeavg
+        ! print *, file_rhocolumn_domain_timeavg
 
         filename_precipareal_domain_daily = trim(prefix_outfiles) // filename_precipareal_domain_daily
-        file_precipareal_domain_daily = trim(path_output) // filename_precipareal_domain_daily
-        print *, file_precipareal_domain_daily
+        file_precipareal_domain_daily = trim(path_output) // "/" // filename_precipareal_domain_daily
+        ! print *, file_precipareal_domain_daily
 
         filename_paths_xy = trim(prefix_outfiles) // filename_paths_xy
-        file_paths_xy = trim(path_output) // filename_paths_xy
-        print *, file_paths_xy
+        file_paths_xy = trim(path_output) // "/" // filename_paths_xy
+        ! print *, file_paths_xy
+
+        filename_rhocolumn_grid = trim(prefix_outfiles) // filename_rhocolumn_grid
+        file_rhocolumn_grid = trim(path_output) // "/" // filename_rhocolumn_grid
+
+        filename_rhoslabs_grid = trim(prefix_outfiles) // filename_rhoslabs_grid
+        file_rhoslabs_grid = trim(path_output) // "/" // filename_rhoslabs_grid
 
     end subroutine
 
@@ -635,42 +722,42 @@ contains
     end subroutine
 
     ! allocates arrays for the following files and also copies the last data of the last files (for tracing purposes)
-    subroutine allocate_global_arrays(day, max_day_array, i_file)
+    subroutine allocate_global_arrays(i_file, min_day_array, newday1, max_day_array)
         use global_data
-        integer, intent(in)  :: day
-        integer, intent(out) :: max_day_array
+        integer, intent(out)  :: newday1
+        integer, intent(out) :: min_day_array, max_day_array
         integer, intent(in) :: i_file
 
-        integer           :: n_days_file
-        integer           :: min_day_array
+        integer           :: n_datadt_file
+        integer           :: max_day_array_old
         integer           :: min_dt_array, max_dt_array
         ! select 
         
-        n_days_file = get_ndays_file_PP(i_file)
-        print *,"n_days_file=",n_days_file
+        n_datadt_file = get_n_datadt_file_PP(i_file)
+        print *,"n_datadt_file=",n_datadt_file
         ! end select
         
 
 
         if (i_file == 1) then
-            allocate(PP(bigx,bigy,n_days_file))
-            allocate(ET(bigx,bigy,n_days_file))
-            allocate(PW(bigx,bigy,nslabs,n_days_file))
-            allocate(U3(bigx,bigy,nslabs, n_days_file*24/velocity_dt))     
-            allocate(V3(bigx,bigy,nslabs, n_days_file*24/velocity_dt))
-            allocate(PW_FLUX(bigx,bigy,nslabs-1,n_days_file))
-            allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_days_file))
-            max_day_array = n_days_file
+            allocate(PP(bigx,bigy,n_datadt_file))
+            allocate(ET(bigx,bigy,n_datadt_file))
+            allocate(PW(bigx,bigy,nslabs,n_datadt_file))
+            allocate(U3(bigx,bigy,nslabs, n_datadt_file* data_dt/UV_dt))     
+            allocate(V3(bigx,bigy,nslabs, n_datadt_file* data_dt/UV_dt))
+            allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
+            allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
+            max_day_array = n_datadt_file
         else 
-            max_dt_array = max_day_array *24 / velocity_dt
+            max_dt_array = max_day_array * data_dt/ UV_dt
 
-            temp_PP = PP(:,:,max_day_array-n_days_tracing+1:max_day_array)
-            temp_ET = ET(:,:,max_day_array-n_days_tracing+1:max_day_array)
-            temp_PW = PW(:,:,:,max_day_array-n_days_tracing+1:max_day_array)
-            temp_U3 = U3(:,:,:,max_dt_array-n_dt_tracing+1:max_dt_array)
-            temp_V3 = V3(:,:,:,max_dt_array-n_dt_tracing+1:max_dt_array)
-            temp_PW_FLUX = PW_FLUX(:,:,:,max_day_array-n_days_tracing+1:max_day_array)
-            ! temp_MASK_PW_FLUX = MASK_PW_FLUX(:,:,:,max_day_array-n_days_tracing+1:max_day_array)
+            temp_PP = PP(:,:,max_day_array-n_datadt_tracing+1:max_day_array)
+            temp_ET = ET(:,:,max_day_array-n_datadt_tracing+1:max_day_array)
+            temp_PW = PW(:,:,:,max_day_array-n_datadt_tracing+1:max_day_array)
+            temp_U3 = U3(:,:,:,max_dt_array-n_UVdt_tracing+1:max_dt_array)
+            temp_V3 = V3(:,:,:,max_dt_array-n_UVdt_tracing+1:max_dt_array)
+            temp_PW_FLUX = PW_FLUX(:,:,:,max_day_array-n_datadt_tracing+1:max_day_array)
+            ! temp_MASK_PW_FLUX = MASK_PW_FLUX(:,:,:,max_day_array-n_datadt_tracing+1:max_day_array)
 
             deallocate(PP)
             deallocate(ET)
@@ -679,11 +766,16 @@ contains
             deallocate(V3)
             deallocate(PW_FLUX)
             deallocate(MASK_PW_FLUX)
-            min_day_array = day - n_days_tracing
-            max_day_array = day + n_days_file -1 
-            ! min_dt_array = (min_day_array - 1) * 24/velocity_dt + 1
-            min_dt_array = (day- 1) * 24/velocity_dt + 1 - n_dt_tracing
-            max_dt_array = max_day_array * 24/velocity_dt
+            ! min_day_array = day - n_datadt_tracing
+            ! max_day_array = day + n_datadt_file -1 
+            max_day_array_old = max_day_array
+            newday1 = max_day_array_old + 1
+            min_day_array = (max_day_array_old +1) - n_datadt_tracing
+            max_day_array = (max_day_array_old +1) + n_datadt_file -1 
+            ! min_dt_array = (min_day_array - 1) * 24/UV_dt + 1
+            ! min_dt_array = (day- 1) * data_dt/UV_dt + 1 - n_UVdt_tracing
+            min_dt_array = (max_day_array_old)* data_dt/UV_dt + 1 - n_UVdt_tracing
+            max_dt_array = max_day_array * data_dt/UV_dt
             allocate(PP(bigx,bigy,min_day_array:max_day_array ))
             allocate(ET(bigx,bigy,min_day_array:max_day_array ))
             allocate(PW(bigx,bigy,nslabs,min_day_array:max_day_array))
@@ -696,34 +788,35 @@ contains
 
     end subroutine
 
-    function get_ndays_file_PP(i_file) result(n_days)
+    function get_n_datadt_file_PP(i_file) result(n_datadt)
         use global_data, only : nbytes_real,file_PP, bigx, bigy
         integer, intent(in)  :: i_file
-        integer              :: file_size
-        integer              :: n_days
+        integer(8)           :: file_size
+        integer              :: n_datadt
         
         INQUIRE(FILE=file_PP(i_file), SIZE=file_size)
-
-        n_days = file_size / (nbytes_real * bigx * bigy) 
+        
+        n_datadt = file_size / (nbytes_real * bigx * bigy) 
     end function
 
     subroutine check_and_update_globalarrays(day, max_iday_array, i_file)
         integer, intent(in)     :: day
         integer, intent(inout)     :: max_iday_array
         integer, intent(inout)     :: i_file
+        integer                    :: min_iday_array, newday1
 
-        if (day > max_iday_array) then
+        do while (day > max_iday_array) !then
             i_file = i_file + 1
             print *,'Reading data from files', i_file
-            call allocate_global_arrays(day, max_iday_array, i_file)
+            call allocate_global_arrays(i_file,min_iday_array, newday1, max_iday_array)
             print *,"max_day_array= ",max_iday_array
-            call openfile(day, i_file)  
+            call read_data(newday1, i_file)  
             call daily_FLUX()
-        end if
+        end do
     end subroutine
 
     ! reads  MASK_TOPO, MAP_REGIONS
-    subroutine readmap()
+    subroutine read_masks()
         use global_data, only : MASK_TOPO, MAP_REGIONS, bigx, bigy, file_regions, file_topomask
 
         real,dimension(bigx,bigy) :: regions2b
@@ -744,18 +837,18 @@ contains
 
 
     ! reads PP, ET, PW, U3, V3, W3U, W3D, QLIMIT
-    subroutine openfile(day, i_file)
+    subroutine read_data(day, i_file)
         use global_data, only : PP, ET, PW, U3, V3, PW_FLUX, &
                                 file_PP, file_ET, file_PW, file_U3, file_V3, file_PWflux,&
-                                bigx, bigy, ndays, &
-                                temp_PP, temp_ET,temp_PW,temp_U3, temp_V3, temp_PW_FLUX, n_days_tracing, &
-                                velocity_dt
+                                bigx, bigy, n_datadt, &
+                                temp_PP, temp_ET,temp_PW,temp_U3, temp_V3, temp_PW_FLUX, n_datadt_tracing, &
+                                UV_dt, data_dt
         integer, intent(in)  :: day, i_file
         integer :: i,j,k
         integer :: i_dt
 
         ! real(4) :: startTime, stopTime
-        i_dt = (day  -1 )* 24 / velocity_dt + 1
+        i_dt = (day  -1 )* data_dt / UV_dt + 1
 
         ! call cpu_time(startTime)
         open(10, file = file_PP(i_file), status='old',form='unformatted',access='stream')
@@ -778,12 +871,13 @@ contains
             read(10) ET(:,:,day:)
             close(10)
         end if
+        ! ET = ET / 8 ! MODIFIED2025
 
         write(*,'(A20)') 'ET/PP have been read'
 
         ! correction ET
         ET = max(ET, 0.0)
-        ! do k = 1, ndays
+        ! do k = 1, n_datadt
         !     do j = 1, bigy
         !       do i = 1, bigx
         !         ET(i,j,k) = max(ET(i,j,k),0.0)
@@ -847,7 +941,7 @@ contains
 
 
     ! reads domain
-    subroutine monsoon()
+    subroutine read_targetregion()
         use global_data, only: domain_ij, domsize, file_domain_i, file_domain_j
         real, dimension(domsize,2) :: domain2
         integer :: ii
@@ -867,9 +961,9 @@ contains
 
 
     subroutine daily_FLUX()
-        use global_data, only : PW_FLUX, MASK_PW_FLUX, velocity_dt, bigx, bigy, nslabs!, n_days
+        use global_data, only : PW_FLUX, MASK_PW_FLUX, UV_dt, bigx, bigy, nslabs, data_dt, UV_dt !, n_datadt
         ! use global_data, only : QLIMIT, W3U, W3D, PW_FLUX, MASK_PW_FLUX, &
-        !                         ndays, velocity_dt, bigx, bigy, ndays, NAN_value, nslabs
+        !                         n_datadt, UV_dt, bigx, bigy, n_datadt, NAN_value, nslabs
         integer  :: i, j, istep_start, istep_end, istep, iday, i_interslab, flag1
         integer   :: day_min, day_max
         ! real(4)     :: sum_day  
@@ -891,13 +985,14 @@ contains
             end do 
         end do
 
-        PW_FLUX = PW_FLUX / (24/velocity_dt)   ! ' converted to daily averages with mm/3h unite.'
-        
+        if (data_dt .ne. UV_dt) then
+            PW_FLUX = PW_FLUX / (data_dt/UV_dt)   ! ' converted to daily averages with mm/UV_dt unite.'
+        end if
 
 
-        ! do iday = 1, ndays
-        !     istep_start = (iday-1)*24/velocity_dt+1
-        !     istep_end = iday*24/velocity_dt
+        ! do iday = 1, n_datadt
+        !     istep_start = (iday-1)*24/UV_dt+1
+        !     istep_end = iday*24/UV_dt
 
         !     do j = 1,bigy
         !         do i = 1,bigx
@@ -914,7 +1009,7 @@ contains
         !                         sum_day = sum_day + &
         !                             (QLIMIT(i,j,i_interslab,istep) * W3U(i,j,i_interslab,istep) + &
         !                             QLIMIT(i,j,i_interslab,istep) * W3D(i,j,i_interslab,istep) ) * &
-        !                             3600 * velocity_dt           ! 3600 seg in 1 hour
+        !                             3600 * UV_dt           ! 3600 seg in 1 hour
         !                     end if
         !                 end do
         !                 if (flag1 == 0) then 
@@ -923,19 +1018,19 @@ contains
         !                     else
         !                         MASK_PW_FLUX(i,j,i_interslab, iday) = 2
         !                     end if
-        !                     PW_FLUX(i,j,i_interslab,iday) = sum_day/(24/velocity_dt)     ! 24 hours in 1 day
+        !                     PW_FLUX(i,j,i_interslab,iday) = sum_day/(24/UV_dt)     ! 24 hours in 1 day
         !                 end if
         !             end do
         !         end do
         !     end do
         ! end do
-        print *, "Precipitable water (moisture?) flux (PW_FLUX) calculated as daily averages with mm/3h units"
-        ! print *, ' converted to daily averages with mm/3h unite.'
+        print *, "Precipitable water (moisture?) flux (PW_FLUX) calculated as daily averages with mm/UV_dt units"
+        ! print *, ' converted to daily averages with mm/UV_dt unite.'
     end subroutine 
 
 
     subroutine write_rhodomain_daily(rho_domain)
-        use global_data, only: day1,day2, nregions, nslabs, file_rhodomain_daily 
+        use global_data, only: t_data_start,t_data_end, nregions, nslabs, file_rhodomain_daily 
         real(4), dimension(:,:,:), intent(in)            :: rho_domain
         integer                                          :: day, iday, islab, i_region
         integer, dimension(nregions)                     :: id_regions
@@ -949,8 +1044,8 @@ contains
         open(10, file = file_rhodomain_daily, status = "REPLACE")
 
         write(10,"(A3,A,A4,*(', ', I10))") "day", ",","slab", id_regions 
-        do day = day1,day2
-            iday = day - day1 +1
+        do day = t_data_start,t_data_end
+            iday = day - t_data_start +1
             do islab = 1,nslabs
                 write(10,"(I3,A,I4,*(', ', F10.6))") day, ",", islab, rho_domain(:,islab, iday)
             end do
@@ -960,24 +1055,80 @@ contains
 
 
     subroutine write_rhocolumn_domain_daily(rhocolumn_domain)
-        use global_data, only: day1,day2, nregions, file_rhocolumn_domain_daily 
+        use global_data, only: t_data_start,t_data_end, nregions, file_rhocolumn_domain_daily, &
+                               data_dt, datetime0
+        use csv_module
+        use datetime_module
+        ! use 
+
         real(4), dimension(:,:), intent(in)              :: rhocolumn_domain
-        integer                                          :: day, iday, i_region
+        integer                                          :: t_data, i_t_data, i_region!, iday
         integer, dimension(nregions)                     :: id_regions
         ! character(10), dimension(nregions)               :: name_regions
+        type(csv_file) :: f
+        logical :: status_ok
+        type(datetime)                                   :: datetime_c
 
         do i_region = 1, nregions
             id_regions(i_region) = i_region
         end do
 
-        open(10, file = file_rhocolumn_domain_daily, status = "REPLACE" )
+        ! set optional inputs:
+        call f%initialize(verbose = .true., enclose_strings_in_quotes = .false.)
+        ! open the file
+        call f%open(file_rhocolumn_domain_daily,n_cols=size(id_regions)+1,&
+                    status_ok=status_ok) ! default REPLACe not append, append=.true. for appending 
+        ! add header
+        call f%add("datetime")
+        call f%add(id_regions, int_fmt = "(I7)", trim_str = .false.)
+        ! call f%add("datetime")
+        ! call f%add("id_region")
+        ! call f%add("rho")
+        ! call f%add("traced_precip")
+        ! call f%add("precip")
+        ! print "(I25)", 20
 
-        write(10,"(A3,*(', ', I10))") "day", id_regions 
-        do day = day1,day2
-            iday = day - day1 +1
-            write(10,"(I3,*(', ', F10.6))") day, rhocolumn_domain(:, iday)
+        call f%next_row()
+        ! add some data:
+        do t_data = t_data_start, t_data_end
+            datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
+            call f%add(datetime_c%strftime("%Y-%m-%dT%H:%M:%S"))
+            i_t_data = t_data - t_data_start + 1 
+            do i_region = 1, nregions
+                call f%add(rhocolumn_domain(i_region, i_t_data),real_fmt='(F7.5)')
+            end do
+            call f%next_row()
+            ! do i_region = 1,nregions
+            !     call f%add(datetime_c%strftime("%Y-%m-%dT%H:%M:%S"))
+            !     call f%add(i_region, int_fmt = "(I7)")
+            !     i_t_data = t_data - t_data_start + 1 
+            !     call f%add(rhocolumn_domain(i_region, i_t_data),real_fmt='(F7.5)')
+            !     call f%add(rhocolumn_domain(i_region, i_t_data),real_fmt='(F7.5)')
+            !     ! call f%add()
+            !     call f%next_row()
+            ! end do
+            ! call f%add(datetime_c%strftime("%Y-%m-%dT%H:%M:%S"))
+            ! i_t_data = t_data - t_data_start + 1 
+            ! call f%add(rhocolumn_domain(:, i_t_data),real_fmt='(F7.5)')
+            ! call f%next_row()
         end do
-        close(10)
+        
+        ! call f%add([1.0_wp,2.0_wp,3.0_wp],real_fmt='(F5.3)')
+        ! call f%add(.true.)
+        ! call f%next_row()
+        ! call f%add([4.0_wp,5.0_wp,6.0_wp],real_fmt='(F5.3)')
+        ! call f%add(.false.)
+        ! call f%next_row()
+        ! finished
+        call f%close(status_ok)
+
+        ! open(10, file = file_rhocolumn_domain_daily, status = "REPLACE" )
+        ! write(10,"(A3,*(', ', I10))") "day", id_regions 
+        ! do day = t_data_start,t_data_end
+        !     iday = day - t_data_start +1
+        !     write(10,"(I6,*(', ', F10.6))") day, rhocolumn_domain(:, iday)
+        ! end do
+        ! close(10)
     end subroutine
 
 
@@ -1014,25 +1165,57 @@ contains
 
 
     subroutine  write_precipareal_daily(PP_areal_days)
-        use global_data, only: day2, day1, file_precipareal_domain_daily
-        real(4), dimension(day2-day1+1)    :: PP_areal_days
-        integer                            :: iday
+        use global_data, only: t_data_end, t_data_start, file_precipareal_domain_daily, data_dt, datetime0
+        use csv_module
+        use datetime_module
+        
+        real(4), dimension(t_data_end-t_data_start+1)    :: PP_areal_days
+        integer                                          :: t_data, i_t_data
+        type(csv_file)                                   :: f
+        logical                                          :: status_ok
+        type(datetime)                                   :: datetime_c
 
-        open(10, file = file_precipareal_domain_daily, status = "REPLACE") 
-        write(10, "(A10,', ', A10)") adjustl("day"), adjustl("pr_areal")
-        do iday = day1, day2
-            write(10, "(I10,', ', F12.6)")   iday, PP_areal_days(iday-day1 + 1)
+        ! set optional inputs:
+        call f%initialize(verbose = .true., enclose_strings_in_quotes = .false.)
+        ! open the file
+        call f%open(file_precipareal_domain_daily,n_cols=2,&
+                    status_ok=status_ok) ! default REPLACe not append, append=.true. for appending 
+        ! add header
+        call f%add("datetime")
+        call f%add("prareal")
+        call f%next_row()
+
+        do t_data = t_data_start, t_data_end
+            datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
+            call f%add(datetime_c%strftime("%Y-%m-%dT%H:%M:%S"))
+            i_t_data = t_data - t_data_start + 1 
+            call f%add(PP_areal_days(i_t_data),real_fmt='(F9.5)')
+            call f%next_row()
         end do
-        close(10)
+        call f%close(status_ok)
+
+        ! call f%add("datetime")
+        ! open(10, file = file_precipareal_domain_daily, status = "REPLACE") 
+        ! write(10, "(A10,', ', A10)") adjustl("day"), adjustl("pr_areal")
+        ! do t_data = t_data_start, t_data_end
+        !     write(10, "(I10,', ', F12.6)")   t_data, PP_areal_days(iday-t_data_start + 1)
+        ! end do
+        ! close(10)
     end subroutine
 
     ! step: every how many timesteps of the tracing_dt, it will be written
-    subroutine write_path(path_xy, length_path, islab, iday, k, step)
-        use global_data, only:   day1, file_paths_xy, domain_ij, delta_write_paths, ij0_write_paths
+    subroutine write_path(path_xy, length_path, islab, t_data, k, step,datetime0)
+        use global_data, only:   t_data_start, t_data_end, file_paths_xy, domain_ij, delta_write_paths, &
+                                 ij0_write_paths, tracing_dt
+        use datetime_module
+        use csv_module
         real(4), dimension(:,:)  :: path_xy
-        integer, intent(in)      :: islab, iday, length_path, k, step
+        integer, intent(in)      :: islab, t_data, length_path, k, step
         integer                  :: i_point
+        logical                  :: status_ok
         logical, save            :: first_time = .true.
+        type(datetime)           :: datetime0, datetime_tr
+        type(csv_file),save      :: fpaths
 
         if (delta_write_paths  /= 1 ) then
             if ((mod(domain_ij(k,1) - ij0_write_paths, delta_write_paths) /=0) .or. &
@@ -1041,27 +1224,168 @@ contains
             end if
             ! print *, "k = ", k, ",  i = ", domain_ij(k,1), ",  j = ", domain_ij(k,2)
         end if
-
-
+        
+        ! set optional inputs:
+        call fpaths%initialize(verbose = .true., enclose_strings_in_quotes = .false.)
+        ! open the file
         if (first_time) then
-            open(10, file = file_paths_xy, status = "REPLACE") 
-            write(10, "(A6,',', A4,', ', A5, ', ', A6,', ',A12, ', ', A12)") &
-                    adjustl("day"), adjustl("slab"), adjustl("point"), adjustl("k"), adjustl("X"), adjustl("Y")
+            call fpaths%open(file_paths_xy,n_cols=7,&
+                        status_ok=status_ok) ! default REPLACe not append, append=.true. for appending 
             first_time = .false.
         else
-            open(10, file = file_paths_xy, status = "OLD", position = "APPEND")
+            call fpaths%open(file_paths_xy,n_cols=7,&
+                        status_ok=status_ok, append = .true.) ! default REPLACe not append, append=.true. for appending 
         end if
+        ! add header
+        ! call fpaths%add(["t_data_start","datetime", "slab","point","k","X","Y"])
+        call fpaths%add("dt_data_start")
+        call fpaths%add("datetime")
+        call fpaths%add("slab")
+        call fpaths%add("point")
+        call fpaths%add(["k","X","Y"])
+        call fpaths%next_row()
+        
+        
+        ! if (first_time) then
+        !     open(151, file = file_paths_xy, status = "REPLACE") 
+        !     write(151, "(A6,',', A20, ', ', A4,', ', A5, ', ', A6,', ',A12, ', ', A12)") &
+        !             adjustl("t_data"), adjustl("datetime_start"),adjustl("slab"), adjustl("point"), adjustl("k"), adjustl("X"), adjustl("Y")
+        !     first_time = .false.
+        ! else
+        !     ! open(151, file = file_paths_xy, status = "OLD", position = "APPEND")
+        ! end if
 
         do i_point = 1, length_path
+            if ((t_data >= 32) .and. (t_data <= 38)) then
+              ! nothing
+            else 
+                cycle
+            end if
+            
             if (mod(i_point-1, step) == 0) then
-                write(10, "(I6,',',I4, ', ', I5, ', ', I6 ,', ', F12.2, ', ', F12.2)")  &
-                                iday, islab, i_point, k, path_xy(1, i_point), path_xy(2, i_point)
+                ! write(10, "(I6,',',I4, ', ', I5, ', ', I6 ,', ', F12.2, ', ', F12.2)")  &
+                !                 iday, datetime_tr%strftime("%Y-%m-%dT%H:%M:%S"), islab, i_point, k, path_xy(1, i_point), path_xy(2, i_point)
+                call fpaths%add(t_data)  
+                datetime_tr = datetime0 - timedelta(seconds = tracing_dt * (i_point - 1))
+                call fpaths%add(datetime_tr%strftime("%Y-%m-%dT%H:%M:%S"))
+                call fpaths%add([islab,i_point,k])
+                call fpaths%add([path_xy(1, i_point), path_xy(2, i_point)])
+                call fpaths%next_row()
             end if
         end do
 
+        call fpaths%close(status_ok)
+        ! if (t_data == t_data_end) then
+        !     call fpaths%close(status_ok)
+        ! end if
+        ! close(10)
 
-        close(10)
+    end subroutine
+
+
+    subroutine write_rhocolumn_grid_sr(rhocolumn)
         
+        use global_data, only:   t_data_start, t_data_end, nregions, domain_ij, &
+                                 domsize, bigx, bigy, file_rhocolumn_grid
+        use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
+        use, intrinsic :: iso_fortran_env, only: real32
+        implicit none
+        ! real(real32) :: nan
+        real(4)        :: nan        
+        logical, save            :: first_time = .true.
+        integer(4), save         :: count, i, j, i_reg, k
+        real(4), dimension(nregions,domsize)   :: rhocolumn
+        real(4), dimension(bigx, bigy, nregions)   :: rhocolumn_grid
+
+        nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
+
+        rhocolumn_grid = nan
+        do i_reg = 1,nregions
+            do k = 1, domsize
+                i=domain_ij(k,1)
+                j=domain_ij(k,2) 
+                rhocolumn_grid(i,j,i_reg) = rhocolumn(i_reg, k)
+
+                
+                if ((count == t_data_start + 30 - 1) .and. i == 51 .and. j == 48) then
+                    print *, "count = ", count
+                    print *, "rho = ", rhocolumn_grid(51,48,1)
+                    print *, "k = ", k
+                end if
+        
+            end do
+        end do
+
+        if (first_time) then
+            open(120, file = file_rhocolumn_grid, access = "STREAM",&
+                 form = "UNFORMATTED", status = "REPLACE") 
+            write(120) rhocolumn_grid
+            count = t_data_start
+            first_time = .false.
+        else
+            write(120) rhocolumn_grid
+            count = count + 1
+        end if
+
+
+        if (count == t_data_end) then
+            close(120) 
+        end if
+
+    end subroutine
+
+
+
+    subroutine write_rhoslabs_grid_sr(rhoslabs)
+        
+        use global_data, only:   t_data_start, t_data_end, nregions, domain_ij, &
+                                 domsize, bigx, bigy, file_rhoslabs_grid, nslabs
+        use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
+        use, intrinsic :: iso_fortran_env, only: real32
+        implicit none
+        ! real(real32) :: nan
+        real(4)        :: nan        
+        logical, save            :: first_time = .true.
+        integer(4), save         :: count
+        integer(4)               :: i, j, i_reg, k, islab
+        real(4), dimension(nregions,domsize, nslabs)   :: rhoslabs
+        real(4), dimension(bigx, bigy, nslabs, nregions)   :: rhoslabs_grid
+
+        nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
+
+        rhoslabs_grid = nan
+        do i_reg = 1,nregions
+            do islab = 1, nslabs
+                do k = 1, domsize
+                    i=domain_ij(k,1)
+                    j=domain_ij(k,2) 
+                    rhoslabs_grid(i,j,islab,i_reg) = rhoslabs(i_reg, k,islab)
+
+                    if ((count == t_data_start + 30 - 1) .and. i == 51 .and. j == 48) then
+                        print *, "count = ", count
+                        print *, "rho = ", rhoslabs_grid(51,48,1,1)
+                        print *, "k = ", k
+                    end if
+            
+                end do
+            end do
+        end do
+
+        if (first_time) then
+            open(121, file = file_rhoslabs_grid, access = "STREAM",&
+                 form = "UNFORMATTED", status = "REPLACE") 
+            write(121) rhoslabs_grid
+            count = t_data_start
+            first_time = .false.
+        else
+            write(121) rhoslabs_grid
+            count = count + 1
+        end if
+
+
+        if (count == t_data_end) then
+            close(120) 
+        end if
 
     end subroutine
 

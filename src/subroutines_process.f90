@@ -35,26 +35,27 @@ contains
 
     end subroutine
 
-    subroutine average_in_time(rho_days, weights_days, ndays, nrhos, avg_rho)
-        
+    subroutine average_in_time(rho_days, weights_days, n_datadt, nrhos, avg_rho)
+
         integer, intent(in)                            :: nrhos
-        integer, intent(in)                            :: ndays
-        real(4), dimension(nrhos,ndays), intent(in)    :: rho_days
-        real(4), dimension(ndays), intent(in)          :: weights_days
+        integer, intent(in)                            :: n_datadt
+        real(4), dimension(nrhos,n_datadt), intent(in)    :: rho_days
+        real(4), dimension(n_datadt), intent(in)          :: weights_days
         real(4), dimension(nrhos), intent(out)         :: avg_rho
-        integer                                        :: i_rho
+        integer                                        :: i_rho, i
         integer                                        :: PP_total
 
-        PP_total = sum(weights_days)
-        
+        PP_total = sum(weights_days)        
+
         do i_rho = 1, nrhos 
             avg_rho(i_rho) = sum(rho_days(i_rho,:) * weights_days) / PP_total
         end do
 
     end subroutine
 
+    
     subroutine calculate_column_rho(rho,PW_domain, size, n_rhos, nslabs, rho_average, verbose)
-        
+        USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE
         real(4), dimension(n_rhos, size, nslabs), intent(in)  :: rho
         real(4), dimension(size, nslabs), intent(in)          :: PW_domain
         real(4), dimension(n_rhos, size), intent(out)         :: rho_average                   
@@ -63,18 +64,23 @@ contains
         real(4), dimension(nslabs)                            :: PW_values
         real(4)                                               :: PW_total_value
         real(4), dimension(n_rhos)                            :: sum_temp
+        ! logical, dimension(nslabs)                            :: isfinite_rho
         logical, dimension(nslabs)                            :: isvalue_PW
         logical, optional                                     :: verbose
 
         do k = 1,size
             PW_values = PW_domain(k,:)
-            isvalue_PW = .not.isnan(PW_values)
+            isvalue_PW = (.not.isnan(PW_values))
             PW_total_value = sum(PW_values, mask = isvalue_PW )
+            ! isfinite_rho = IEEE_IS_FINITE(rho(i_rho,k,:))  !! selecting one region since the mask is the same for all regions
+            ! print *, isfinite_rho
+            ! PW_total_value = sum(PW_values, mask = isfinite_rho )
             
             do i_rho = 1,n_rhos
                 sum_temp(i_rho) = 0  
                 do islab = 1,nslabs
                     if (isvalue_PW(islab)) then
+                    ! if (isfinite_rho(islab)) then
                         sum_temp(i_rho) = sum_temp(i_rho)  + rho(i_rho, k, islab) * PW_values(islab)
                     end if
                 end do        
@@ -85,9 +91,9 @@ contains
             if (present(verbose)) then
                 if (verbose) then
                 !if (i_rho == 4) then
-                    if (k >= 1900) then
+                    if (k == 1817) then
                         print *, "k=",k,", PW_values=",PW_values, "PW_total=",PW_total_value,&
-                            "rho=",rho(4, k, :), "rho_avg=",rho_average(4,k)
+                            "rho=",rho(1, k, :), "rho_avg=",rho_average(1,k)
                     end if
                 !end if   
                 end if
@@ -170,7 +176,7 @@ contains
 !_____________________________________________________________
     PURE subroutine SPTNQ_U(x,y1,y2,z,n,s)
     ! subroutine SPTNQ_U(x,y1,y2,z,n,s,verbose)
-        use global_data, only: velocity_dt
+        use global_data, only: UV_dt
         ! REMOVE
         USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE
         ! END REMOVE
@@ -204,12 +210,12 @@ contains
             !-----for total column integration------
             bt1=y1(i)
             bt2=y1(i+1)
-            sst1  = sst1 + a*(bt1+bt2)/(2*3600*velocity_dt)  ! 3600 secs/h
+            sst1  = sst1 + a*(bt1+bt2)/(2*3600*UV_dt)  ! 3600 secs/h
             rho   = 1-exp(-sst1)
             !-----for upper layer integration-------
             b1 =y2(i)
             b2 =y2(i+1)
-            ewa1=(b1+b2)/(2*3600*velocity_dt)                ! 3600 secs/h
+            ewa1=(b1+b2)/(2*3600*UV_dt)                ! 3600 secs/h
             ss1=ss1+a*ewa1
             ew1=b1*rho
             ew2=b2*rho
@@ -219,7 +225,7 @@ contains
             if (z(i+1) == 0) then
                 ew2=b2
             end if
-            ewa2=(ew1+ew2)/(2*3600*velocity_dt)              ! 3600 secs/h
+            ewa2=(ew1+ew2)/(2*3600*UV_dt)              ! 3600 secs/h
             ! REMOVE
             ! ss2_old = ss2
             ! end REMOVE
@@ -239,7 +245,7 @@ contains
     ! subroutine to do the integral along back-trajectory in lower slab
     !-----------------------------------------------------------
     PURE subroutine SPTNQ_L(x,y1,y2,y3,z,n,s)
-        use global_data, only: velocity_dt
+        use global_data, only: UV_dt
         implicit none
         integer,intent(in):: n
         real(4),dimension(n),intent(in)::x,y1,y2,y3
@@ -260,7 +266,7 @@ contains
             !------for total column integration--------
             bt1 = y1(i)
             bt2 = y1(i+1)
-            sst1 = sst1 + a*(bt1+bt2)/(2*3600*velocity_dt)
+            sst1 = sst1 + a*(bt1+bt2)/(2*3600*UV_dt)
             rho  = 1-exp(-sst1)
             !------for lower layer integration-------    
             et1=y2(i)
@@ -275,27 +281,28 @@ contains
                 et2 = 0.0
                 qw2 = 0.0
             end if
-            ewa1=(et1+qw1+et2+qw2)/(2*3600*velocity_dt)
+            ewa1=(et1+qw1+et2+qw2)/(2*3600*UV_dt)
             ss1=ss1+a*ewa1
             ew1=et1+qw1*rho
             ew2=et2+qw2*rho
-            ewa2=(ew1+ew2)/(2*3600*velocity_dt)
+            ewa2=(ew1+ew2)/(2*3600*UV_dt)
             ss2=ss2+exp(ss1)*ewa2*a
         end do
         s = exp(-ss1)*ss2
     end subroutine
 
 
-    PURE subroutine calculate_rho2_slab2__2LDRM(path_ij, path_sections, n_sections,iday, rho2,verbose_in)
-        USE global_data, only: max_tracing, tracing_dt, nregions
+    subroutine calculate_rho2_slab2__2LDRM(path_ij, path_sections, n_sections, i_UVdt, rho2,verbose_in)
+        USE global_data, only: max_tracing, tracing_dt, nregions, UV_dt
+        USE global_data, only:  PW, data_dt,ET, PW_flux ! remove 2 last ones
         USE derived_types
         integer, dimension(:,:), intent(in)       :: path_ij
-        integer, intent(in)                       :: iday, n_sections
+        integer, intent(in)                       :: i_UVdt, n_sections
         type(start_end), dimension(:), intent(in) :: path_sections
         real, dimension(nregions), intent(out)    :: rho2
         integer                                   :: i_section, itime, itime_start, itime_end,&
-                                                        id_region, i, j, iday_tracing,&
-                                                        counter_tracing_dts, n_tracingdt_in_day, &
+                                                        id_region, i, j, i_UVdt_tracing,&
+                                                        counter_tracing_dts, n_tracingdt_in_UVdt, &
                                                         length_section
         real(4),dimension(max_tracing)            :: E_PW_ratio
         ! real(4)                                 :: E_PW_ratio_last
@@ -307,6 +314,12 @@ contains
         real, dimension(3,max_tracing)            :: various_reg
         real(4), dimension(nregions)              :: sum_region 
         !!!! UPDATE !!!! improve names varios_reg & s1
+        ! remove
+        integer  :: i_datadt
+        real(4),  dimension(2)   :: PW_values
+        real(4)                  :: PW_FLUX_value, ET_value
+
+        ! en remove
         
         ! REMOVE 
         logical, intent(in), optional :: verbose_in
@@ -321,31 +334,43 @@ contains
             time_secs(itime) = (itime - 1) * tracing_dt          ! probably include in global data
         end do
 
-        iday_tracing = iday
+        i_UVdt_tracing = i_UVdt
         counter_tracing_dts  = 0
-        n_tracingdt_in_day = (24*60*60) / tracing_dt
+        ! n_tracingdt_in_day = (24*60*60) / tracing_dt
+        n_tracingdt_in_UVdt = (UV_dt*60*60) / tracing_dt 
 
         ! calculating ratios
         do itime = 1, path_sections(n_sections)%end_l
             i = path_ij(1, itime)
             j = path_ij(2, itime)
             
-            if (counter_tracing_dts == n_tracingdt_in_day ) then
+            if (counter_tracing_dts == n_tracingdt_in_UVdt ) then
                 counter_tracing_dts = 0
-                iday_tracing  = iday_tracing - 1
+                i_UVdt_tracing  = i_UVdt_tracing - 1
             end if
             counter_tracing_dts = counter_tracing_dts + 1
 
-            call getratios_from_ij_slab2__2LDRM(i, j, iday_tracing, E_PW_ratio(itime), &
+            call getratios_from_ij_slab2__2LDRM(i, j, i_UVdt_tracing, E_PW_ratio(itime), &
                                                 FLUXUP_ratio(itime),flag(itime))
 
             ! REMOVE
-            ! if (verbose) then
-            !     if (itime >=24 .and. itime < 224) then
-            !         write(*,"('i_time = ',I0, ', i= ',I0,', j= ',I0, ', E_PW_ratio = ',F12.10, ', FLUXUP_ratio = ',F14.10 )") &
-            !             itime, i, j, E_PW_ratio(itime), FLUXUP_ratio(itime)
-            !     end if
-            ! end if
+            if (verbose) then
+                if (itime >=1 .and. itime < 224) then
+                    write(*,"('i_time = ',I0,'i_UVdt_trac=',I0, ', i= ',I0,', j= ',I0, ',&
+                        & E_PW_ratio = ',F12.10, ', FLUXUP_ratio = ',F14.10,  'ndt=', I0 )") &
+                        itime,i_UVdt_tracing, i, j, E_PW_ratio(itime), FLUXUP_ratio(itime), &
+                        n_tracingdt_in_UVdt
+
+                        i_datadt = 1 + (i_UVdt - 1) / (data_dt / UV_dt)   ! converting from i_UVdt to i_datadt
+                        PW_values = PW(i, j, :, i_datadt)
+                        ! ET_value = ET(i, j, i_datadt) 
+                        ET_value = ET(i, j, i_datadt) / (data_dt / UV_dt)   ! MODIFIED 2025
+                        PW_FLUX_value = PW_FLUX(i, j, 1 , i_datadt)      !!!! MODIFY
+                    write(*,"   ('    i_datadt=', I0, ',  PW_values=', F8.5, F8.5, ',  ET_value=',F8.5, &
+                             & ',  PW_FLUX_value=', F8.5)") &
+                             i_datadt, PW_values(1), PW_values(2), ET_value, PW_FLUX_value
+                end if
+            end if
             ! END REMOVE
         end do
 
@@ -418,16 +443,16 @@ contains
 
     end subroutine
 
-    PURE subroutine calculate_rho1_slab1__2LDRM(path_ij, path_sections, n_sections,iday, rho1, verbose)
-        USE global_data, only: max_tracing, tracing_dt, nregions, PW_FLUX, NAN_value
+    PURE subroutine calculate_rho1_slab1__2LDRM(path_ij, path_sections, n_sections,i_UVdt, rho1, verbose)
+        USE global_data, only: max_tracing, tracing_dt, nregions, PW_FLUX, NAN_value, UV_dt, data_dt
         USE derived_types
         integer, dimension(:,:), intent(in)       :: path_ij
-        integer, intent(in)                       :: iday, n_sections
+        integer, intent(in)                       :: i_UVdt, n_sections
         type(start_end), dimension(:), intent(in) :: path_sections
         real, dimension(nregions), intent(out)    :: rho1
         integer                                   :: i_section, itime, itime_start, itime_end,&
-                                                        id_region, i, j, iday_tracing,&
-                                                        counter_tracing_dts, n_tracingdt_in_day,&
+                                                        id_region, i, j, i_UVdt_tracing,&
+                                                        counter_tracing_dts, n_tracingdt_in_UVdt,&
                                                         length_section
         real(4),dimension(max_tracing)            :: E_PW1_ratio, E_PW_ratio
         ! real(4)                                 :: E_PW_ratio_last
@@ -453,22 +478,22 @@ contains
             time_secs(itime) = (itime - 1) * tracing_dt          ! probably include in global data
         end do
 
-        iday_tracing = iday
+        i_UVdt_tracing = i_UVdt
         counter_tracing_dts  = 0
-        n_tracingdt_in_day = (24*60*60) / tracing_dt
+        n_tracingdt_in_UVdt = (UV_dt*60*60) / tracing_dt
 
         ! calculating ratios
         do itime = 1, path_sections(n_sections)%end_l
             i = path_ij(1, itime)
             j = path_ij(2, itime)
                 
-            if (counter_tracing_dts == n_tracingdt_in_day ) then
+            if (counter_tracing_dts == n_tracingdt_in_UVdt ) then
                 counter_tracing_dts = 0
-                iday_tracing  = iday_tracing - 1
+                i_UVdt_tracing  = i_UVdt_tracing - 1
             end if
             counter_tracing_dts = counter_tracing_dts + 1
 
-            call getratios_from_ij_slab1__2LDRM(i, j, iday_tracing, E_PW1_ratio(itime), &
+            call getratios_from_ij_slab1__2LDRM(i, j, i_UVdt_tracing, E_PW1_ratio(itime), &
                                                 E_PW_ratio(itime), FLUXDOWN_ratio(itime),flag(itime))
             
             ! REMOVE
@@ -558,6 +583,10 @@ contains
         rho1 = 0.0
         do i_section = 1,n_sections
           id_region = path_sections(i_section)%id_region
+        !   if (id_region < 0) then
+        !       print *,"i_section is ", i_section
+        !       print *,"id_region is ", id_region
+        !   end if
           rho1(id_region) = rho1(id_region)+max(various_reg(3,i_section),0.0)
         end do
 
@@ -571,24 +600,28 @@ contains
 
 
 
-    PURE subroutine getratios_from_ij_slab2__2LDRM(i, j, iday, E_PW_ratio, FLUX_ratio, flag)
+    PURE subroutine getratios_from_ij_slab2__2LDRM(i, j, i_UVdt, E_PW_ratio, FLUX_ratio, flag)
         use global_data, only : PW, PW_FLUX, ET, MASK_PW_FLUX, MASK_TOPO, U3, V3, &
-                                nslabs, NAN_value
+                                nslabs, NAN_value, UV_dt, data_dt
         
         integer, intent(in)          :: i,j
-        integer, intent(in)          :: iday
+        integer, intent(in)          :: i_UVdt
         real(4), intent(out)         :: E_PW_ratio, FLUX_ratio
         real(4), dimension(nslabs)   :: PW_values
         real(4)                      :: PW_FLUX_value
         integer                      :: mask1, mask2
         integer, intent(out)         :: flag
         real(4)                      :: FLUX_UP, PWsum, ET_value
+        integer                      :: i_datadt
 
         ! call get_xy_from_ij(x, y, out_i, out_j)
 
-        PW_values = PW(i, j, :, iday)
-        ET_value = ET(i, j, iday)
-        PW_FLUX_value = PW_FLUX(i, j, 1 , iday)      !!!! MODIFY
+        ! maybe create getter functions  :    get_PWvalues_from_ij_iUVdt(.....)
+        i_datadt = 1 + (i_UVdt - 1) / (data_dt / UV_dt)   ! converting from i_UVdt to i_datadt
+        PW_values = PW(i, j, :, i_datadt)
+        ! ET_value = ET(i, j, i_datadt) 
+        ET_value = ET(i, j, i_datadt) / (data_dt / UV_dt)   ! MODIFIED 2025
+        PW_FLUX_value = PW_FLUX(i, j, 1 , i_datadt)      !!!! MODIFY
 
         ! ! should be better if by default it is required to have mask with the same number of slabs as the other variables
         ! if (islab < nslabs) then
@@ -604,7 +637,7 @@ contains
 
         !!!! UPDATE !!!!\
         mask1 = MASK_TOPO(i, j, 1) 
-        mask2= MASK_PW_FLUX(i, j, 1, iday)
+        mask2= MASK_PW_FLUX(i, j, 1, i_datadt)
         
         ! PW_flux * (PWsum)/(PW1 * PW2)  (FLUX ratio)
         E_PW_ratio = ET_value / PWsum 
@@ -624,28 +657,32 @@ contains
     end subroutine
 
 
-    PURE subroutine getratios_from_ij_slab1__2LDRM(i, j, iday, E_PW1_ratio, E_PW_ratio, FLUX_ratio,  flag)
+    PURE subroutine getratios_from_ij_slab1__2LDRM(i, j, i_UVdt, E_PW1_ratio, E_PW_ratio, FLUX_ratio,  flag)
         use global_data, only : PW, PW_FLUX, ET, MASK_PW_FLUX, MASK_TOPO, U3, V3, &
-                                nslabs, NAN_value
+                                nslabs, NAN_value, UV_dt, data_dt
         
         integer, intent(in)          :: i,j
-        integer, intent(in)          :: iday
+        integer, intent(in)          :: i_UVdt
         real(4), intent(out)         :: E_PW1_ratio, E_PW_ratio, FLUX_ratio
         real(4), dimension(nslabs)   :: PW_values
         real(4)                      :: PW_FLUX_value
         integer                      :: mask1, mask2
         integer, intent(out)         :: flag
         real(4)                      :: FLUX_DOWN, PWsum, ET_value
+        integer                      :: i_datadt
 
-        PW_values = PW(i, j, :, iday)
-        ET_value = ET(i, j, iday)
-        PW_FLUX_value = PW_FLUX(i, j, 1 , iday)      
+        ! maybe create getter functions  :    get_PWvalues_from_ij_iUVdt(.....)
+        i_datadt = 1 + (i_UVdt - 1) / (data_dt / UV_dt)   ! converting from i_UVdt to i_datadt
+        PW_values = PW(i, j, :, i_datadt)
+        ! ET_value = ET(i, j, i_datadt)
+        ET_value = ET(i, j, i_datadt) / (data_dt / UV_dt)   ! MODIFIED 2025
+        PW_FLUX_value = PW_FLUX(i, j, 1 , i_datadt)      
 
         PWsum = sum(PW_values, mask = .NOT.(isnan(PW_values)))
           
         !!!! UPDATE !!!!\
         mask1 = MASK_TOPO(i, j, 1) 
-        mask2= MASK_PW_FLUX(i, j, 1, iday)
+        mask2= MASK_PW_FLUX(i, j, 1, i_datadt)
         
         E_PW_ratio = ET_value / PWsum 
         if ((mask1 == 0) .or. (mask2 == 0)) then  ! 1 layer
@@ -663,5 +700,218 @@ contains
             flag = 5
         end if
     end subroutine
+
+
+    subroutine calculate_rhos_slabs__diffin(path_ij, path_sections, n_sections, i_UVdt,islab_out, rho, verbose_in)
+        USE global_data, only: max_tracing, tracing_dt, nregions, UV_dt, nslabs, tracing_dt, UV_dt
+        USE global_data, only:  PW, data_dt,ET, PW_flux ! remove 2 last ones
+        USE global_data, only: solver
+        USE derived_types
+        USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE, ieee_quiet_nan, ieee_value, IEEE_IS_NAN
+        integer, dimension(:,:), intent(in)       :: path_ij
+        integer, intent(in)                       :: i_UVdt, n_sections, islab_out
+        type(start_end), dimension(:), intent(in) :: path_sections
+        real(4), dimension(nregions), intent(out)    :: rho
+        integer                                   :: i_section, itime, itime_start, itime_end,&
+                                                        id_region, i, j, i_UVdt_tracing,&
+                                                        counter_tracing_dts, n_tracingdt_in_UVdt, &
+                                                        length_section, i_datadt_tracing
+        integer                                   :: length_path
+        real(4), dimension(nslabs, nregions, max_tracing) :: rhoslabs_path ! maybe as output var
+        ! real(4), dimension(nregions, max_tracing) :: rho1_path ! maybe as output var
+        real(4),dimension(max_tracing)            :: E_PW_ratio
+        ! real(4)                                 :: E_PW_ratio_last
+        real(4),dimension(max_tracing)            :: FLUXUP_ratio
+        ! real(4)                                 :: FLUXUP_ratio_last
+        integer,dimension(max_tracing)            :: flag
+        real(4)                                   :: s1
+        real(4), dimension(max_tracing)              :: time_secs
+        real(4), dimension(3,max_tracing)            :: various_reg
+        real(4), dimension(nregions)              :: sum_region 
+        real(4)                                   :: d_rho1, d_rho2
+        real(4)                                   :: nan_value
+        !!!! UPDATE !!!! improve names varios_reg & s1
+        ! remove
+        integer  :: i_datadt
+        real(4),  dimension(2)   :: PW_values
+        real(4)                  :: PW_FLUX_value, ET_value, PWflux_down_value, PWflux_up_value
+        real(4)                  :: PW1_ref, PW2_ref
+        ! en remove
+        
+        ! REMOVE 
+        real(4)                   :: ratio
+        logical, intent(in), optional :: verbose_in
+        logical                       :: verbose
+
+        verbose = .false.
+
+        nan_value = ieee_value( nan_value, ieee_quiet_nan )
+
+        if (present(verbose_in))  verbose = verbose_in
+        ! END REMOVE
+        
+        if (n_sections == 0) then
+            rho(:) = 0 ! REMOVE  ! with this 0s enter in the areal average. Should they ?
+            ! rho1(:) = NAN_value ! problematic a true nan is needed 
+            return
+        end if
+
+        length_path = path_sections(n_sections)%end_l
+
+        do itime = 1,max_tracing
+            !!!! UPDATE !!!!
+            time_secs(itime) = (itime - 1) * tracing_dt          ! probably include in global data
+        end do
+
+        i_UVdt_tracing = i_UVdt
+        counter_tracing_dts  = 0
+        ! n_tracingdt_in_day = (24*60*60) / tracing_dt
+        n_tracingdt_in_UVdt = (UV_dt*60*60) / tracing_dt 
+
+        ! calculating ratios
+        i_UVdt_tracing = i_UVdt - (itime-1) / 6 
+        
+        i_section = n_sections
+        
+
+        rhoslabs_path = 0 ! implicitly also sets 0 to the first time step
+
+
+        do itime = length_path,1, -1  ! to start at the begginning of the path   (EXISTS IF itime = 1 later)
+            i = path_ij(1, itime)
+            j = path_ij(2, itime)
+
+            
+            i_UVdt_tracing = i_UVdt - (itime -1)/ n_tracingdt_in_UVdt
+            i_datadt_tracing = 1 + (i_UVdt_tracing - 1) / (data_dt / UV_dt)
+
+            if (itime < path_sections(i_section)%start_l) then 
+                i_section = i_section - 1
+            end if
+
+            ! if (counter_tracing_dts == n_tracingdt_in_UVdt ) then
+            !     counter_tracing_dts = 0
+            !     i_UVdt_tracing  = i_UVdt_tracing - 1
+            ! end if
+            ! counter_tracing_dts = counter_tracing_dts + 1
+            
+            PW_values = PW(i, j, :, i_datadt_tracing)
+            ! ET_value = ET(i, j, i_datadt)
+            ET_value = ET(i, j, i_datadt_tracing) / (data_dt / UV_dt)   ! MODIFIED 2025
+            PW_FLUX_value = PW_FLUX(i, j, 1 , i_datadt_tracing)     
+            
+            if (itime == 1) exit
+
+
+            PWflux_down_value = max(-PW_FLUX_value,0.0)
+            PWflux_up_value = max(PW_FLUX_value,0.0)
+            
+            do id_region = 1, nregions
+                ! if (IEEE_IS_FINITE(PW_values(1))) then   ! why in some cases PW_values(1)) is finite but PWflux_value not?
+                if (IEEE_IS_FINITE(PW_FLUX_value) .and. IEEE_IS_FINITE(PW_values(1))) then 
+                ! if (IEEE_IS_FINITE(PW_FLUX_value) .and. (PW_values(1) > 0)) then
+                    ! PW1_ref = PW_values(1) 
+                    if (solver == 3) then
+                        ! PW1_ref = max(PW1_ref, 0)
+                        PW1_ref = PW_values(1)
+                    end if
+
+                    if (solver == 2) then
+                        PW1_ref = PW_values(1) - PW_FLUX_value * tracing_dt / (UV_dt * 60 * 60)
+                        PW1_ref = max(PW1_ref, 0.0)   ! VALE
+                        PW1_ref = PW1_ref + ET_value  * tracing_dt / (UV_dt * 60 * 60) ! VALE
+                        ! PW1_ref = 
+                    end if
+
+                    if (solver == 4) then
+                       PW1_ref = PW_values(1) + ( ET_value - PW_FLUX_value) * tracing_dt / (UV_dt * 60 * 60)
+                    end if
+
+                    ! ratio = abs( ( ET_value - PW_FLUX_value) * tracing_dt / (UV_dt * 60 * 60)) / PW1_ref 
+                    ! if (ratio >=  1) then
+                    !     print *, "ratio =", ratio, " , at itime = ", itime
+                    ! end if
+                    if (PW1_ref <= 0.0) then
+                        if (solver == 2)      rhoslabs_path(1, id_region, itime-1) = 0
+                        if (solver == 3)      rhoslabs_path(1, id_region, itime-1) = 0 !rhoslabs_path(1, id_region, itime)  ! nothing changes
+                        if (solver == 4)      rhoslabs_path(1, id_region, itime-1) = 0
+                    else 
+                        ! PW1_ref = PW_values(1) 
+                        if (id_region == path_sections(i_section)%id_region) then
+                            d_rho1 = &
+                            (( ET_value + rhoslabs_path(2,id_region,itime) * PWflux_down_value) /PW1_ref  - &
+                                rhoslabs_path(1, id_region, itime) * (ET_value + PWflux_down_value) / PW1_ref ) * &
+                                tracing_dt / (UV_dt * 60 * 60)
+                        else 
+                            d_rho1 = ((rhoslabs_path(2, id_region, itime) * PWflux_down_value)  / PW1_ref  - &
+                                rhoslabs_path(1, id_region, itime) * (ET_value + PWflux_down_value) / PW1_ref ) * &
+                                tracing_dt / (UV_dt * 60 * 60)
+                        end if
+                        ! updating
+                        rhoslabs_path(1, id_region, itime-1) =  rhoslabs_path(1, id_region, itime) + d_rho1
+                        ! if ( IEEE_IS_FINITE(rhoslabs_path(1, id_region, itime) ))  then
+                        !      rhoslabs_path(1, id_region, itime-1) =  rhoslabs_path(1, id_region, itime) + d_rho1
+                        ! else
+                        !      rhoslabs_path(1, id_region, itime-1)  = d_rho1
+                        ! end if
+
+                        if (rhoslabs_path(1, id_region, itime-1) < 0)  rhoslabs_path(1, id_region, itime-1) = 0
+                        if (rhoslabs_path(1, id_region, itime-1) > 1)  rhoslabs_path(1, id_region, itime-1) = 1
+                    end if
+
+                    if (solver == 2)  PW2_ref = PW_values(2) + PW_FLUX_value * tracing_dt / (UV_dt * 60 * 60)
+                    if (solver == 3)  PW2_ref = PW_values(2) 
+                    if (solver == 4)  PW2_ref = PW_values(2) + PW_FLUX_value * tracing_dt / (UV_dt * 60 * 60)
+
+                    d_rho2 = (rhoslabs_path(1, id_region, itime) - rhoslabs_path(2, id_region, itime)) * & 
+                            ( PWflux_up_value / PW2_ref ) * tracing_dt / (UV_dt * 60 * 60)
+                    ! updating
+                    rhoslabs_path(2, id_region, itime-1)  = rhoslabs_path(2, id_region, itime) +d_rho2    
+                    if (rhoslabs_path(2, id_region, itime-1)  > rhoslabs_path(1, id_region, itime) ) then
+                         rhoslabs_path(2, id_region, itime-1) = rhoslabs_path(1, id_region, itime) 
+                    end if
+                else 
+                    if (solver == 2)   PW2_ref = PW_values(2) + ET_value * tracing_dt / (UV_dt * 60 * 60)
+                    if (solver == 3)   PW2_ref = PW_values(2) 
+                    if (solver == 4 )  PW2_ref = PW_values(2) + ET_value * tracing_dt / (UV_dt * 60 * 60)
+                    
+                    if (id_region == path_sections(i_section)%id_region) then
+                        d_rho2 = (1- rhoslabs_path(2, id_region, itime)) * & 
+                        ( ET_value / PW2_ref  ) * tracing_dt / (UV_dt * 60 * 60)
+                    else
+                        d_rho2 = (- rhoslabs_path(2, id_region, itime)) * & 
+                        ( ET_value / PW2_ref  ) * tracing_dt / (UV_dt * 60 * 60)
+                    end if
+
+                    ! rhoslabs_path(1, id_region, itime-1)  = rhoslabs_path(1, id_region, itime) +d_rho1
+                    rhoslabs_path(1, id_region, itime-1)  = 0! nan_value
+                    rhoslabs_path(2, id_region, itime-1)  = rhoslabs_path(2, id_region, itime) +d_rho2   
+                end if
+
+                ! if (verbose .and. (id_region == 1).and.(itime <=379) .and. (itime >= 372)) then 
+                if (verbose .and. (id_region == 1) ) then 
+                    print *, "region 1:  itime = ", itime, "rhos = ", rhoslabs_path(:, 1, itime), &
+                            ", d_rho2 = ", d_rho2, ", d_rho1 = ", d_rho1, ", PW_values = ", PW_values, &
+                            ", ET_value = ", ET_value, ", PW_FLUX_value", PW_FLUX_value
+                end if
+
+            end do
+
+        end do 
+
+        ! FINAL OUTPUTS
+        rho = rhoslabs_path(islab_out,:,1)
+        if (islab_out == 1) then
+            if (IEEE_IS_NAN(PW_FLUX_value) .or. IEEE_IS_NAN(PW_values(1))) then 
+                rho = 0 ! nan_value
+            end if
+        end if
+        
+        
+    end subroutine
+
+
+
+
 
 END MODULE subroutines_process

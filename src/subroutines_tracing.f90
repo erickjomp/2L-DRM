@@ -61,13 +61,13 @@ contains
 
 
     ! option_next_point   :   1 for iterative technique, 2 for direct technique
-    subroutine tracing_from_ij(i1, j1, islab, iday, option_next_point, path_xy, path_ij, length_path, path_uv, verbose)
+    subroutine tracing_from_ij(i1, j1, islab, i_UVdt_start, option_next_point, path_xy, path_ij, length_path, path_uv, verbose)
 
-        use global_data, only :  U3,V3,max_tracing,velocity_dt, &
+        use global_data, only :  U3,V3,max_tracing,UV_dt, &
                                     tol_error_iteration, max_iteration, NAN_value, tracing_dt
-        integer, intent(in)                                      :: i1,j1,islab,iday
+        integer, intent(in)                                      :: i1,j1,islab,i_UVdt_start
         integer, intent(in)                                      :: option_next_point
-        integer                                                  :: time,i_velstep, next_i, next_j, i_velstep_next
+        integer                                                  :: time,i_UVdt, next_i, next_j, i_UVdt_next
         real(4), dimension(2,max_tracing), intent(out)           :: path_xy
         real(4), dimension(2,max_tracing), intent(out), optional :: path_uv
         integer, dimension(2,max_tracing), intent(out)           :: path_ij
@@ -77,7 +77,7 @@ contains
         real(4)                                                  :: x,y,next_x,next_y, u, v, next_u, next_v
         logical                                                  :: is_end
         ! integer(4)                                             :: next_i, next_j
-        integer                                                  :: n_tracingdt_in_veldt
+        integer                                                  :: n_tracingdt_in_UVdt
         ! REMOVE
         logical, intent(in), optional                            :: verbose
         logical                                                  :: verbose2
@@ -88,19 +88,20 @@ contains
         call get_xy_from_ij(i,j,x,y)
 
          !!!! UPDATE !!!!
-        n_tracingdt_in_veldt = (velocity_dt * 60 * 60)/ tracing_dt  ! probably should go in GLOBAL DATA
+        n_tracingdt_in_UVdt = (UV_dt * 60 * 60)/ tracing_dt  ! probably should go in GLOBAL DATA
 
-        ! tracing_dt = real(velocity_dt * ) /   
+        ! tracing_dt = real(UV_dt * ) /   
         
-        i_velstep = iday * (24 / velocity_dt)
-        counter_tracing_dts  = 0          !  when counter_tracing_dt == valve1, then i_velstep--
+        ! i_UVdt = iday * (24 / UV_dt)
+        i_UVdt = i_UVdt_start
+        counter_tracing_dts  = 0          !  when counter_tracing_dt == valve1, then i_UVdt--
 
         ! print *, "i  ", i
         ! print *, "j", j
         ! print *, "i_slab", islab
-        ! print *, "i_velstep", i_velstep
-        u = U3(i,j,islab,i_velstep)
-        v = V3(i,j,islab,i_velstep)
+        ! print *, "i_UVdt", i_UVdt
+        u = U3(i,j,islab,i_UVdt)
+        v = V3(i,j,islab,i_UVdt)
 
         if (isnan(u) .or. isnan(v) ) then
             ! REMOVE
@@ -146,20 +147,19 @@ contains
             ! and add is_end = .false. before loop and  deactivate the   if (is_end) 
 
             counter_tracing_dts = counter_tracing_dts + 1
-            if (counter_tracing_dts == n_tracingdt_in_veldt) then
+            if (counter_tracing_dts == n_tracingdt_in_UVdt) then
                 counter_tracing_dts = 0
-                i_velstep_next = i_velstep - 1
-                if (i_velstep_next <= 0)  then
+                i_UVdt_next = i_UVdt - 1
+                if (i_UVdt_next <= 0)  then
                     stop "Not possible to complete backtracing due to insufficient data back in time from day: "
                 end if
             else 
-                i_velstep_next = i_velstep
+                i_UVdt_next = i_UVdt
             end if 
 
             ! REMOVE
-            u = U3(i,j,islab,i_velstep)
-            v = V3(i,j,islab,i_velstep)
-
+            u = U3(i,j,islab,i_UVdt)
+            v = V3(i,j,islab,i_UVdt)
             ! end REMOVE
 
             ! REMOVE
@@ -167,7 +167,7 @@ contains
                 if (verbose .and. time < 4) then 
                     print *, " Looking inside tracing: time = ", time
                     print *, "i=",i,"j=",j,"x=",x,"y=",y,"u=",u,"v=",v,&
-                            "i_velstep=",i_velstep
+                            "i_UVdt=",i_UVdt
                 end if
                 if (verbose .and. (time >= 455) .and. (time <= 460)) then
                     verbose2 = .true.
@@ -194,8 +194,8 @@ contains
                                             x = x, y = y, &
                                             u = u, v = v, &
                                             dt = real(tracing_dt), &
-                                            Ugrid_precedent = U3(:,:,islab,i_velstep), &
-                                            Vgrid_precedent = V3(:,:,islab,i_velstep), &
+                                            Ugrid_precedent = U3(:,:,islab,i_UVdt), &
+                                            Vgrid_precedent = V3(:,:,islab,i_UVdt), &
                                             max_iteration = max_iteration, &
                                             tol =  tol_error_iteration, &
                                             next_x = next_x, & ! output
@@ -211,8 +211,8 @@ contains
                 call next_point__direct(i = i, j = j, &
                                         x = x, y = y, &
                                         u = u, v = v, dt = real(tracing_dt), &
-                                        Ugrid_precedent = U3(:,:,islab,i_velstep_next), &
-                                        Vgrid_precedent = V3(:,:,islab,i_velstep_next), &
+                                        Ugrid_precedent = U3(:,:,islab,i_UVdt_next), &
+                                        Vgrid_precedent = V3(:,:,islab,i_UVdt_next), &
                                         next_x = next_x, &  ! output
                                         next_y = next_y, &  ! output
                                         next_u = next_u, &  ! output 
@@ -229,7 +229,7 @@ contains
             v = next_v
             i = next_i
             j = next_j
-            i_velstep = i_velstep_next
+            i_UVdt = i_UVdt_next
 
         end do tracing_loop
 
