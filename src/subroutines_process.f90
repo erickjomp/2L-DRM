@@ -62,25 +62,27 @@ contains
         integer, intent(in)                                   :: size, n_rhos, nslabs
         integer                                               :: k, islab, i_rho
         real(4), dimension(nslabs)                            :: PW_values
+        real(4), dimension(nslabs)                            :: PWflux_values
         real(4)                                               :: PW_total_value
         real(4), dimension(n_rhos)                            :: sum_temp
         ! logical, dimension(nslabs)                            :: isfinite_rho
-        logical, dimension(nslabs)                            :: isvalue_PW
+        logical, dimension(nslabs)                            :: isvalue_PW, isfinite_rho
         logical, optional                                     :: verbose
 
         do k = 1,size
             PW_values = PW_domain(k,:)
-            isvalue_PW = (.not.isnan(PW_values))
-            PW_total_value = sum(PW_values, mask = isvalue_PW )
-            ! isfinite_rho = IEEE_IS_FINITE(rho(i_rho,k,:))  !! selecting one region since the mask is the same for all regions
+            ! isvalue_PW = (.not.isnan(PW_values)) 
+            ! PW_total_value = sum(PW_values, mask = isvalue_PW )
+
+            isfinite_rho = IEEE_IS_FINITE(rho(1,k,:))  !! selecting one region since the mask is the same for all regions
             ! print *, isfinite_rho
-            ! PW_total_value = sum(PW_values, mask = isfinite_rho )
+            PW_total_value = sum(PW_values, mask = isfinite_rho )
             
             do i_rho = 1,n_rhos
                 sum_temp(i_rho) = 0  
                 do islab = 1,nslabs
-                    if (isvalue_PW(islab)) then
-                    ! if (isfinite_rho(islab)) then
+                    ! if (isvalue_PW(islab)) then
+                    if (isfinite_rho(islab)) then
                         sum_temp(i_rho) = sum_temp(i_rho)  + rho(i_rho, k, islab) * PW_values(islab)
                     end if
                 end do        
@@ -112,16 +114,19 @@ contains
         real(4)                                     :: total_PP
         integer                                     :: k, i_rho
         real(4), dimension(n_rhos)                  :: sum_temp 
+        logical, dimension(size)                 :: mask_values
         ! integer, intent(in), dimension(size), optional          :: mask_domain
 
         ! total_PP = sum(PP_values) ! when there is no NAN is gaurateed
-        total_PP = sum(PP_values, MASK = .not. isnan(PP_values))       
+        mask_values = (.not. isnan(PP_values)) .and.  (.not. isnan(rho(1,:)))   ! for all regions (n_rhos) is the same nan struture
+        total_PP = sum(PP_values, MASK = mask_values)       
 
         sum_temp(:) = 0.0
 
         do k = 1,size
             do i_rho = 1, n_rhos
-                if (.not. isnan(PP_values(k))) then
+                ! if (.not. isnan(PP_values(k))) then
+                if (mask_values(k)) then
                     sum_temp(i_rho) = sum_temp(i_rho) +  rho(i_rho,k) * PP_values(k)
                 end if
             end do
@@ -717,41 +722,32 @@ contains
                                                         counter_tracing_dts, n_tracingdt_in_UVdt, &
                                                         length_section, i_datadt_tracing
         integer                                   :: length_path
-        real(4), dimension(nslabs, nregions, max_tracing) :: rhoslabs_path ! maybe as output var
-        ! real(4), dimension(nregions, max_tracing) :: rho1_path ! maybe as output var
-        real(4),dimension(max_tracing)            :: E_PW_ratio
-        ! real(4)                                 :: E_PW_ratio_last
-        real(4),dimension(max_tracing)            :: FLUXUP_ratio
-        ! real(4)                                 :: FLUXUP_ratio_last
-        integer,dimension(max_tracing)            :: flag
-        real(4)                                   :: s1
-        real(4), dimension(max_tracing)              :: time_secs
-        real(4), dimension(3,max_tracing)            :: various_reg
+        real(4), dimension(nslabs, nregions,max_tracing) :: rhoslabs_path ! maybe as output var
+        real(4), dimension(max_tracing)           :: time_secs
         real(4), dimension(nregions)              :: sum_region 
-        real(4)                                   :: d_rho1, d_rho2
+        real(4)                                   :: ratio_stability
         real(4)                                   :: nan_value
         !!!! UPDATE !!!! improve names varios_reg & s1
-        ! remove
-        integer  :: i_datadt
-        real(4),  dimension(2)   :: PW_values
-        real(4)                  :: PW_FLUX_value, ET_value, PWflux_down_value, PWflux_up_value
-        real(4)                  :: PW1_ref, PW2_ref
-        ! en remove
+        integer                       :: i_datadt, islab
+        real(4),  dimension(nslabs)   :: PW_colvalues
+        real(4)                       :: ET_value, rho_upperslab, rho_lowerslab, rho_slab, PWflux_down, PWflux_up
+        real(4), dimension(nslabs-1)  :: PW_FLUX_colvalues,  PWflux_down_colvalues, PWflux_up_colvalues
+        logical                       :: is_bottom_slab
         
         ! REMOVE 
-        real(4)                   :: ratio
         logical, intent(in), optional :: verbose_in
         logical                       :: verbose
 
         verbose = .false.
+        if (present(verbose_in))  verbose = verbose_in
+        ! END REMOVE
 
         nan_value = ieee_value( nan_value, ieee_quiet_nan )
 
-        if (present(verbose_in))  verbose = verbose_in
-        ! END REMOVE
+
         
         if (n_sections == 0) then
-            rho(:) = 0 ! REMOVE  ! with this 0s enter in the areal average. Should they ?
+            rho(:) = nan_value !nan_value ! REMOVE  ! with this 0s enter in the areal average. Should they ?
             ! rho1(:) = NAN_value ! problematic a true nan is needed 
             return
         end if
@@ -769,13 +765,13 @@ contains
         n_tracingdt_in_UVdt = (UV_dt*60*60) / tracing_dt 
 
         ! calculating ratios
-        i_UVdt_tracing = i_UVdt - (itime-1) / 6 
+        ! i_UVdt_tracing = i_UVdt - (itime-1) / 6 
         
         i_section = n_sections
         
-
         rhoslabs_path = 0 ! implicitly also sets 0 to the first time step
-
+        ! rhoslabs_path = nan_value !0 ! implicitly also sets 0 to the first time step
+        ! rhoslabs_path(length_path,:,:) = 0
 
         do itime = length_path,1, -1  ! to start at the begginning of the path   (EXISTS IF itime = 1 later)
             i = path_ij(1, itime)
@@ -795,119 +791,172 @@ contains
             ! end if
             ! counter_tracing_dts = counter_tracing_dts + 1
             
-            PW_values = PW(i, j, :, i_datadt_tracing)
+            PW_colvalues = PW(i, j, :, i_datadt_tracing)
             ! ET_value = ET(i, j, i_datadt)
             ET_value = ET(i, j, i_datadt_tracing) / (data_dt / UV_dt)   ! MODIFIED 2025
-            PW_FLUX_value = PW_FLUX(i, j, 1 , i_datadt_tracing)     
+            PW_FLUX_colvalues = PW_FLUX(i, j, : , i_datadt_tracing)     
             
             if (itime == 1) exit
 
 
-            PWflux_down_value = max(-PW_FLUX_value,0.0)
-            PWflux_up_value = max(PW_FLUX_value,0.0)
+            PWflux_down_colvalues = max(-PW_FLUX_colvalues,0.0)
+            PWflux_up_colvalues = max(PW_FLUX_colvalues,0.0)
             
             do id_region = 1, nregions
                 ! if (IEEE_IS_FINITE(PW_values(1))) then   ! why in some cases PW_values(1)) is finite but PWflux_value not?
-                if (IEEE_IS_FINITE(PW_FLUX_value) .and. IEEE_IS_FINITE(PW_values(1))) then 
-                ! if (IEEE_IS_FINITE(PW_FLUX_value) .and. (PW_values(1) > 0)) then
-                    ! PW1_ref = PW_values(1) 
-                    if (solver == 3) then
-                        ! PW1_ref = max(PW1_ref, 0)
-                        PW1_ref = PW_values(1)
-                    end if
+                is_bottom_slab = .false.
+                !!!! TOP SLAB
+                ! this can be also included as a normal slab, making rho_upperslab = 0, but maybe less computationally efficient?
+                if (IEEE_IS_FINITE(PW_FLUX_colvalues(nslabs-1)) .and. IEEE_IS_FINITE(PW_colvalues(nslabs-1))) then
+                    PWflux_up = PWflux_up_colvalues(nslabs-1)
+                    rho_lowerslab = rhoslabs_path(nslabs-1, id_region, itime)
 
-                    if (solver == 2) then
-                        PW1_ref = PW_values(1) - PW_FLUX_value * tracing_dt / (UV_dt * 60 * 60)
-                        PW1_ref = max(PW1_ref, 0.0)   ! VALE
-                        PW1_ref = PW1_ref + ET_value  * tracing_dt / (UV_dt * 60 * 60) ! VALE
-                        ! PW1_ref = 
-                    end if
-
-                    if (solver == 4) then
-                       PW1_ref = PW_values(1) + ( ET_value - PW_FLUX_value) * tracing_dt / (UV_dt * 60 * 60)
-                    end if
-
-                    ! ratio = abs( ( ET_value - PW_FLUX_value) * tracing_dt / (UV_dt * 60 * 60)) / PW1_ref 
-                    ! if (ratio >=  1) then
-                    !     print *, "ratio =", ratio, " , at itime = ", itime
+                    ! if (ieee_is_nan(rho_lowerslab)) then
+                    !     rho_lowerslab = 0
                     ! end if
-                    if (PW1_ref <= 0.0) then
-                        if (solver == 2)      rhoslabs_path(1, id_region, itime-1) = 0
-                        if (solver == 3)      rhoslabs_path(1, id_region, itime-1) = 0 !rhoslabs_path(1, id_region, itime)  ! nothing changes
-                        if (solver == 4)      rhoslabs_path(1, id_region, itime-1) = 0
-                    else 
-                        ! PW1_ref = PW_values(1) 
-                        if (id_region == path_sections(i_section)%id_region) then
-                            d_rho1 = &
-                            (( ET_value + rhoslabs_path(2,id_region,itime) * PWflux_down_value) /PW1_ref  - &
-                                rhoslabs_path(1, id_region, itime) * (ET_value + PWflux_down_value) / PW1_ref ) * &
-                                tracing_dt / (UV_dt * 60 * 60)
-                        else 
-                            d_rho1 = ((rhoslabs_path(2, id_region, itime) * PWflux_down_value)  / PW1_ref  - &
-                                rhoslabs_path(1, id_region, itime) * (ET_value + PWflux_down_value) / PW1_ref ) * &
-                                tracing_dt / (UV_dt * 60 * 60)
-                        end if
-                        ! updating
-                        rhoslabs_path(1, id_region, itime-1) =  rhoslabs_path(1, id_region, itime) + d_rho1
-                        ! if ( IEEE_IS_FINITE(rhoslabs_path(1, id_region, itime) ))  then
-                        !      rhoslabs_path(1, id_region, itime-1) =  rhoslabs_path(1, id_region, itime) + d_rho1
-                        ! else
-                        !      rhoslabs_path(1, id_region, itime-1)  = d_rho1
-                        ! end if
-
-                        if (rhoslabs_path(1, id_region, itime-1) < 0)  rhoslabs_path(1, id_region, itime-1) = 0
-                        if (rhoslabs_path(1, id_region, itime-1) > 1)  rhoslabs_path(1, id_region, itime-1) = 1
-                    end if
-
-                    if (solver == 2)  PW2_ref = PW_values(2) + PW_FLUX_value * tracing_dt / (UV_dt * 60 * 60)
-                    if (solver == 3)  PW2_ref = PW_values(2) 
-                    if (solver == 4)  PW2_ref = PW_values(2) + PW_FLUX_value * tracing_dt / (UV_dt * 60 * 60)
-
-                    d_rho2 = (rhoslabs_path(1, id_region, itime) - rhoslabs_path(2, id_region, itime)) * & 
-                            ( PWflux_up_value / PW2_ref ) * tracing_dt / (UV_dt * 60 * 60)
-                    ! updating
-                    rhoslabs_path(2, id_region, itime-1)  = rhoslabs_path(2, id_region, itime) +d_rho2    
-                    if (rhoslabs_path(2, id_region, itime-1)  > rhoslabs_path(1, id_region, itime) ) then
-                         rhoslabs_path(2, id_region, itime-1) = rhoslabs_path(1, id_region, itime) 
-                    end if
                 else 
-                    if (solver == 2)   PW2_ref = PW_values(2) + ET_value * tracing_dt / (UV_dt * 60 * 60)
-                    if (solver == 3)   PW2_ref = PW_values(2) 
-                    if (solver == 4 )  PW2_ref = PW_values(2) + ET_value * tracing_dt / (UV_dt * 60 * 60)
-                    
+                    is_bottom_slab  = .true.
+                    PWflux_up = ET_value
                     if (id_region == path_sections(i_section)%id_region) then
-                        d_rho2 = (1- rhoslabs_path(2, id_region, itime)) * & 
-                        ( ET_value / PW2_ref  ) * tracing_dt / (UV_dt * 60 * 60)
+                        rho_lowerslab = 1
+                    else 
+                        rho_lowerslab = 0
+                    end if
+                end if
+                
+                ! calculatin next rho
+                ratio_stability = PWflux_up / PW_colvalues(nslabs)  * tracing_dt / (UV_dt * 60 * 60)
+                if (ratio_stability < 1) then
+                    rho_slab = rhoslabs_path( nslabs, id_region, itime)
+                    rhoslabs_path( nslabs,id_region, itime - 1) = &
+                        rho_slab + &
+                        (rho_lowerslab - rho_slab ) * &
+                        (PWflux_up / PW_colvalues(nslabs))  * tracing_dt / (UV_dt * 60 * 60)
+                else 
+                    if (solver == 3) then
+                        rhoslabs_path(nslabs , id_region, itime - 1) = &
+                            rho_lowerslab
+                    else if (solver == 2) then
+                        !!! DO SOMETHING 
+                        !!! DECREASE DELTA T and RECALCULATE
+                    end if
+                end if
+
+                ! START REMOVE
+                ! if (verbose .and. (itime <= 32 .and. itime >=28) .and. id_region == 1) then
+                if (verbose  .and. id_region == 1) then
+                    print * , &!"t = ", itime, ", rho_slab =", rho_slab, &
+                               itime, nslabs, ", rho_slab =", rho_slab, &
+                               ", slab = ",nslabs,&
+                               ", ratio_stab = ", ratio_stability, &
+                               ", rho_ls = ", rho_lowerslab, &
+                               ", PWflux_up = ", PWflux_up, ", PW = ", PW_colvalues(nslabs)
+                end if
+                ! END REMOVE
+
+                !!!! OTHER SLABS
+                
+                do islab = nslabs-1,1,-1  
+                    if (is_bottom_slab) exit
+                    ! is bottom slab?
+                    if (islab == 1) then 
+                        is_bottom_slab = .true.
+                    else if (IEEE_IS_NAN(PW_FLUX_colvalues(islab-1)) .or. IEEE_IS_NAN(PW_colvalues(islab-1))) then
+                        is_bottom_slab = .true.
+                    end if 
+                    !!!! set flux and rho coming from lower slab
+                    if (is_bottom_slab) then  ! bottom slab 
+                        PWflux_up = ET_value
+
+                        if (id_region == path_sections(i_section)%id_region) then
+                            rho_lowerslab = 1
+                        else 
+                            rho_lowerslab = 0
+                        end if
+                    else   ! standard slab  
+                        PWflux_up = PWflux_up_colvalues(islab-1)
+                        rho_lowerslab = rhoslabs_path( islab-1, id_region,itime)
+                        ! if (IEEE_IS_NAN(rho_lowerslab)) then
+                        !     rho_lowerslab = 0
+                        ! end if
+                    end if
+                    !!!! set flux and rho coming from upper slab
+                    PWflux_down = PWflux_down_colvalues(islab)
+                    rho_upperslab = rhoslabs_path(islab+1, id_region, itime)
+                    ! if (IEEE_IS_NAN(rho_upperslab)) then
+                    !     rho_upperslab = 0
+                    ! end if
+
+                    ! calculating next rho
+                    ratio_stability = (PWflux_up + PWflux_down) / PW_colvalues(islab)  * tracing_dt / (UV_dt * 60 * 60)
+                    if (ratio_stability < 1) then
+                        rho_slab = rhoslabs_path( islab, id_region,itime)
+                        ! if (IEEE_IS_NAN(rho_slab)) then
+                        !     rho_slab = 0
+                        ! end if
+    
+                        rhoslabs_path(islab, id_region, itime - 1) = &
+                                rho_slab + &
+                                (rho_lowerslab - rho_slab) *  &
+                                PWflux_up / PW_colvalues(islab) * tracing_dt / (UV_dt * 60 * 60) + &
+                                (rho_upperslab - rho_slab) *  &
+                                PWflux_down / PW_colvalues(islab) * tracing_dt / (UV_dt * 60 * 60)
                     else
-                        d_rho2 = (- rhoslabs_path(2, id_region, itime)) * & 
-                        ( ET_value / PW2_ref  ) * tracing_dt / (UV_dt * 60 * 60)
+                        if (solver == 3) then
+                            rhoslabs_path(islab, id_region,itime - 1) = & 
+                                (rho_upperslab * PWflux_down + rho_lowerslab * PWflux_up) / &
+                                (PWflux_down + PWflux_up)
+
+                        else if (solver == 2) then
+                            ! DO SOMETHING HERE
+                            !!! DECREASE DELTA T and RECALCULATE
+                        end if
                     end if
 
-                    ! rhoslabs_path(1, id_region, itime-1)  = rhoslabs_path(1, id_region, itime) +d_rho1
-                    rhoslabs_path(1, id_region, itime-1)  = 0! nan_value
-                    rhoslabs_path(2, id_region, itime-1)  = rhoslabs_path(2, id_region, itime) +d_rho2   
-                end if
+                    ! START REMOVE
+                    if (verbose .and. id_region == 1) then
+                    ! if (verbose .and. (itime <= 32 .and. itime >=28) .and. id_region == 1) then
+                        print * ,&!, "t = ", &
+                                itime, &
+                                islab, &
+                                ", rho_slab =", rho_slab, &
+                                ! ", slab = ",islab,&
+                                ", ratio_stab = ", ratio_stability, &
+                                ! ", rho_ls = ", rho_lowerslab, &
+                                ", rho_us = ", rho_upperslab, &
+                                ! ", PWflux_up = ", PWflux_up, &
+                                ", PWflux_down = ", PWflux_down,&
+                                ", PW = ", PW_colvalues(islab)!,  "PWflux = ", PW_FLUX_colvalues(islab)
+                    end if
+                    ! END REMOVE
 
-                ! if (verbose .and. (id_region == 1).and.(itime <=379) .and. (itime >= 372)) then 
-                if (verbose .and. (id_region == 1) ) then 
-                    print *, "region 1:  itime = ", itime, "rhos = ", rhoslabs_path(:, 1, itime), &
-                            ", d_rho2 = ", d_rho2, ", d_rho1 = ", d_rho1, ", PW_values = ", PW_values, &
-                            ", ET_value = ", ET_value, ", PW_FLUX_value", PW_FLUX_value
-                end if
-
+                    
+                end do
             end do
 
         end do 
 
         ! FINAL OUTPUTS
-        rho = rhoslabs_path(islab_out,:,1)
-        if (islab_out == 1) then
-            if (IEEE_IS_NAN(PW_FLUX_value) .or. IEEE_IS_NAN(PW_values(1))) then 
-                rho = 0 ! nan_value
+        rho = rhoslabs_path(islab_out,:,1) ! first time step
+
+        if (islab_out < nslabs) then
+            if (IEEE_IS_NAN(PW_FLUX_colvalues(islab_out)) .or. IEEE_IS_NAN(PW_colvalues(islab_out))) then 
+                rho = nan_value ! nan_value
+            end if
+        else 
+            if (IEEE_IS_NAN(PW_colvalues(islab_out))) then
+                rho = nan_value
             end if
         end if
         
-        
+        ! DIAGNOSTICS PRINT
+        ! if (verbose) then
+        !     print *, "length_path = ", length_path
+        !     do  itime = length_path,1, -1  
+        !         print *, itime, rhoslabs_path(itime, 1,2)  
+        !     end do
+        ! end if
+
     end subroutine
 
 

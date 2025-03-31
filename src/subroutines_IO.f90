@@ -185,6 +185,15 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
+        call cli%add(switch='--nslabs', &
+                    switch_ab='-ns',    &
+                    help='Number of slabs. Does not work with solver 1 (analytical 2LDRM).',   &
+                    required=.false.,   &
+                    act='store',       &
+                    def="2",           &
+                    error=error_cli)
+        if (error_cli/=0) stop   
+
         call cli%add(switch='--nx', &
                     switch_ab='-nx',    &
                     help='Number of grid cells in X direction',   &
@@ -516,7 +525,8 @@ contains
         if (error_cli/=0) stop
 
         
-
+        call cli%get(switch='-ns', val=nslabs, error=error_cli)
+        if (error_cli/=0) stop
         call cli%get(switch='-nx', val=bigx, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-ny', val=bigy, error=error_cli)
@@ -748,6 +758,10 @@ contains
             allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
             allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
             max_day_array = n_datadt_file
+            ! not necessary, but provided
+            newday1 = 1
+            min_day_array = 1
+            ! end not necessary
         else 
             max_dt_array = max_day_array * data_dt/ UV_dt
 
@@ -809,8 +823,11 @@ contains
             i_file = i_file + 1
             print *,'Reading data from files', i_file
             call allocate_global_arrays(i_file,min_iday_array, newday1, max_iday_array)
+            ! print *,"min_day_array= ",min_iday_array
             print *,"max_day_array= ",max_iday_array
+            ! print *, "newday1 = ",newday1
             call read_data(newday1, i_file)  
+            ! print *, "newday1 = ",newday1
             call daily_FLUX()
         end do
     end subroutine
@@ -842,11 +859,18 @@ contains
                                 file_PP, file_ET, file_PW, file_U3, file_V3, file_PWflux,&
                                 bigx, bigy, n_datadt, &
                                 temp_PP, temp_ET,temp_PW,temp_U3, temp_V3, temp_PW_FLUX, n_datadt_tracing, &
-                                UV_dt, data_dt
+                                UV_dt, data_dt, nslabs
+        USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE, ieee_quiet_nan, ieee_value, IEEE_IS_NAN  ! for TEMPORAL SOLUTIOM
+
         integer, intent(in)  :: day, i_file
         integer :: i,j,k
         integer :: i_dt
-
+        ! START REMOVE
+        ! TEMPORAL SOLUTION
+        integer  :: max_datadt_array, min_datadt_array,i_datadt
+        real(4)  :: nan
+        nan = ieee_value( nan, ieee_quiet_nan )
+        ! END REMOVE
         ! real(4) :: startTime, stopTime
         i_dt = (day  -1 )* data_dt / UV_dt + 1
 
@@ -887,6 +911,7 @@ contains
         
 
         write(*,*) 'ET/PP correction done'
+
         ! call cpu_time(stopTime)
         ! print *, "Total time new: ", stopTime - startTime
 
@@ -900,7 +925,25 @@ contains
             close(10)
         end if
 
-
+        ! START REMOVE
+        ! TEMPORAL SOLUTION ! there should not be negative PW (they only appeared rarely at nonCPM 600hPa, were very small too) (check preprocessing tool)
+        max_datadt_array = ubound(PW,dim = 4)
+        ! min_datadt_array = lbound(PW,dim = 4)
+        ! print *,"day = ", day
+        ! print *,"min_datadt_array = ",min_datadt_array
+        ! print *,"max_datadt_array = ",max_datadt_array
+        do i_datadt = day, max_datadt_array
+            do  k = 1,nslabs
+                do j = 1,bigy
+                    do i = 1,bigx
+                        if (PW(i,j,k,i_datadt) < 0) then
+                            PW(i,j,k,i_datadt) = nan
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        ! END REMOVE
 
         open(10,  file = file_U3(i_file), status='old',form='unformatted',access='stream')
         if (i_file == 1) then
@@ -1340,7 +1383,7 @@ contains
         
         use global_data, only:   t_data_start, t_data_end, nregions, domain_ij, &
                                  domsize, bigx, bigy, file_rhoslabs_grid, nslabs
-        use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
+        use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN, IEEE_IS_NAN
         use, intrinsic :: iso_fortran_env, only: real32
         implicit none
         ! real(real32) :: nan
@@ -1359,14 +1402,9 @@ contains
                 do k = 1, domsize
                     i=domain_ij(k,1)
                     j=domain_ij(k,2) 
-                    rhoslabs_grid(i,j,islab,i_reg) = rhoslabs(i_reg, k,islab)
-
-                    if ((count == t_data_start + 30 - 1) .and. i == 51 .and. j == 48) then
-                        print *, "count = ", count
-                        print *, "rho = ", rhoslabs_grid(51,48,1,1)
-                        print *, "k = ", k
-                    end if
-            
+                    ! if (.not. isnan(rhoslabs(i_reg, k,islab))) then
+                        rhoslabs_grid(i,j,islab,i_reg) = rhoslabs(i_reg, k,islab)
+                    ! end if
                 end do
             end do
         end do

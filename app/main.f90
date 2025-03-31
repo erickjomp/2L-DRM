@@ -67,6 +67,17 @@ program recycling
     n_datadt_analysis= t_data_end-t_data_start+1
 
 
+    if ((nslabs .ne. 2) .and. (solver == 1)) then
+        write(*,"('Can not use solver 1 (analytical 2LDRM) with more than 2 slab')")
+        stop 0
+    end if
+
+    if (solver == 2) then 
+        write(*,"('Solver 2 not implemented yet. Choose solver 1 or 3.')")
+        stop 0
+    end if
+
+
     print * ,"Verbose mode is actived:", verbose
     ! start the daily loop during the chosen duration from day1 to day2
     print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!'
@@ -78,11 +89,6 @@ program recycling
         call check_and_update_globalarrays(t_data, max_tdata_array, i_file)
         i_UVdt = t_data * (data_dt/UV_dt)
 
-        ! if (datetime0 == "0") then
-        !     print *,'time step:', t_data
-        ! else
-        !     print *, strptime()
-        ! end if
         datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
         print *, datetime_c%isoformat(' '), "    | time step = ",t_data
         print *, "----"
@@ -90,124 +96,45 @@ program recycling
         call get_PP_domain(t_data, PP_domain)
         call get_PW_domain(t_data, PW_domain)
 
-        ! if (day == 16) then
-        !     print *, sum(PP_domain)
-        !     print *, sum(PW_FLUX(:,:,:,day),MASK = .not. isnan(PW_FLUX(:,:,:,day)))
-        ! end if
 
-        do islab = 1,2
+
+        do islab = 1,nslabs
             ! start the domain loop
 
-
             !$OMP PARALLEL DO PRIVATE(i,j,path_xy,path_ij,length_path,path_uv, &
-            !$OMP                     path_sections, n_sections)
+            !$OMP                     path_sections, n_sections, verbose2)
             domain : do k=1,domsize 
                 i=domain_ij(k,1)
                 j=domain_ij(k,2)
 
                 call tracing_from_ij(i,j, islab, i_UVdt, option_next_point, &
                                     path_xy, path_ij, length_path, path_uv) ! outputs
-                ! length_path does not include last point in case it runs out of grid or mask
-                ! if (day == 16 .and. k == 100) then
-                !     do i_path = 1,length_path 
-                !         print *, i_path, path_xy(1,i_path), path_xy(2,i_path), path_uv(1, i_path), path_uv(2, i_path), &
-                !                "i_UVdt=",i_UVdt
-                !     end do
-                ! end if
 
                 if (write_paths)  call write_path(path_xy, length_path, islab, t_data, k, step_write_paths, datetime_c)
                 
                 call identify_path_sections(path_ij,length_path, &
                                             path_sections, n_sections)  ! outputs
                 
-                if (islab == 1) then
-                    ! REMOVE
-                    if (t_data == 62 .and. k == 1817) then 
-                        verbose2 = .false.
-                        call calculate_rhos_slabs__diffin(path_ij, &
-                                                    path_sections, n_sections, i_UVdt, &
-                                                    1, rho(:,k,islab),verbose_in = verbose2)   ! outputs
-                        print *,"slab 1 rho diffin = ",rho(:,k,islab)
-                    end if
-
-                    verbose2 = .false.
-                    if (t_data == 384 .and. k == 2565) then 
-                        verbose2 = .false.
-                    end if
-
-                    ! END REMOVE
-                    if (solver == 1) then
+                if (solver == 1) then
+                    if (islab == 1) then
                         call calculate_rho1_slab1__2LDRM(path_ij, &
                                                         path_sections, n_sections, i_UVdt, &
                                                         rho(:,k,islab))   ! outputs
-                    else if (solver >= 2) then
-                        call calculate_rhos_slabs__diffin(path_ij, &
-                                                        path_sections, n_sections, i_UVdt, &
-                                                        1, rho(:,k,islab))   ! outputs
-                    end if 
-                    
-                    ! if (t_data == 32 .and. ieee_is_nan(rho(1,k,islab))) then
-                    !     print *, "t_data = ", t_data ,", k = ", k ,", rho = ", rho(:,k,islab)
-                    ! end if
-                    ! if (k==100 .and. t_data == 32)  print *, "rho2_confirm:",rho(:,k,islab)
 
-                    ! REMOVE
-                    if (t_data == 62 .and. k == 1817) then 
-                        print *,"slab 1 rho = ",rho(:,k,islab)
-                    end if
-                    ! end REMOVE
-                else if (islab == 2) then
-                    verbose2 = .false.
-                    ! REMOVE
-                    if (t_data == 62 .and. k == 1817) then 
+                    else if (islab == 2) then
                         verbose2 = .false.
-                        call calculate_rhos_slabs__diffin(path_ij, &
-                                                    path_sections, n_sections, i_UVdt, &
-                                                    2, rho(:,k,islab),verbose_in = verbose2)   ! outputs
-                        print *,"slab 2 rho diffin = ",rho(:,k,islab)
-                        ! do i_point = 1,path_sections(n_sections)%end_l
-                        !     print *, "i_point:",i_point,  ", path_ij: ",path_ij(1,i_point), path_ij(2,i_point)
-                        ! end do
-                        ! do i_section = 1,n_sections
-                        !     print *, "id_reg= ", path_sections(i_section)%id_region, &
-                        !             ",  start=", path_sections(i_section)%start_l, &
-                        !             ",  end=", path_sections(i_section)%end_l
-                        !     ! id_region, start_l, end_l
-                        ! end do
-                    end if
-
-                    verbose2 = .false.
-                    if (t_data == 310 .and. k == 3024) then  !k=2565
-                        verbose2 = .false.
-                    end if
-
-                    ! end REMOVE
-                    if (solver == 1) then
                         call calculate_rho2_slab2__2LDRM(path_ij, &
-                                                    path_sections, n_sections, i_UVdt, &
-                                                    rho(:,k,islab),verbose_in = verbose2)   ! outputs
-                    else if (solver >= 2) then
-                        call calculate_rhos_slabs__diffin(path_ij, &
-                                                    path_sections, n_sections, i_UVdt, &
-                                                    2, rho(:,k,islab),verbose_in = verbose2)   ! outputs
-                    end if
-                    
-                    if (verbose2)    print *, "rho2_confirm:",rho(:,k,islab)
-                    ! REMOVE
-                    if (t_data == 62 .and. k == 1817) then 
-                        print *,"slab 2 rho = ",rho(:,k,islab)
-                    end if
+                                                        path_sections, n_sections, i_UVdt, &
+                                                        rho(:,k,islab),verbose_in = verbose2)   ! outputs
+                        if (verbose2)    print *, "rho2_confirm:",rho(:,k,islab)
 
-                    ! if (t_data == 32 .and. ieee_is_nan(rho(1,k,islab))) then
-                    !     print *, "slab2:  t_data = ", t_data ,", k = ", k ,", rho = ", rho(:,k,islab)
-                    ! end if
-                    ! if (t_data == 384 .and. .not.(ieee_is_finite(rho(1,k,islab)))) then
-                    
-                    if (t_data == 310 .and. (rho(1,k,islab)<0)) then
-                        print *, "slab2:  t_data = ", t_data ,", k = ", k ,", rho = ", rho(:,k,islab)
                     end if
+                else   ! other solvers
+                    verbose2 = .false.
 
-                    ! end REMOVE
+                    call calculate_rhos_slabs__diffin(path_ij, &
+                                                    path_sections, n_sections, i_UVdt, &
+                                                    islab, rho(:,k,islab), verbose_in = verbose2)   ! outputs
                 end if
             
             end do domain
@@ -219,50 +146,16 @@ program recycling
                                         rho_domain(:,islab,t_data-t_data_start+1))  ! outputs
             if (verbose)  print * ,"slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
 
-            ! found =.false.
-            ! if (islab == 2) then
-            !     print *, sum(PW_domain(:,islab))
-            ! end if
-            ! do i_celldomain = 1,domsize
-            !     do i_region = 1,nregions
-            !         if ((.not. IEEE_IS_FINITE( rho(i_region,i_celldomain,islab))) .and. (islab == 2)) then
-            !             ! if (.not. found)  
-            !             print * , i_region,i_celldomain,"slab", islab, " is Infinite : ",  rho(i_region,i_celldomain,islab)
-            !             ! found = .true.
-            !         end if
-            !     end do
-            ! end do
-            ! do i_celldomain = 1,domsize
-            !     if (.not. IEEE_IS_FINITE( PW_domain(i_celldomain, islab))) then
-            !         if (.not. found) then
-            !             print * , i_celldomain,"slab", islab, " is nan"
-            !         end if
-            !         found = .true.
-            !     end if
-            ! end do
-            
         end do
 
-        if (t_data == 62) then
-        call calculate_column_rho(rho, PW_domain, domsize, nregions, nslabs, &
-                                rhocolumn, .true.)
-        else
         call calculate_column_rho(rho, PW_domain, domsize, nregions, nslabs, &
                                 rhocolumn, .false.)
-        end if
 
         if (write_rhocolumn_grid) then
             call write_rhocolumn_grid_sr(rhocolumn)
             call write_rhoslabs_grid_sr(rho)
         end if
 
-        ! if (t_data >= 60 .and. t_data <= 63) then 
-        !     print * ,"t_data = ", t_data, "rho = ", rho(1,51,48)
-        !     ! do k = 1,100
-        !     !     print *,"k=",k, "slab1", rho(:,k,1), "slab2", rho(:,k,2)
-        !     !     print *, "column  ", "  : ", rhocolumn(:,k)
-        !     ! end do
-        ! end if
 
         call calculate_areal_rho(rhocolumn, &
                                  PP_domain,&
@@ -301,8 +194,6 @@ program recycling
     ! call average_in_time(rho_domain(:,2,:), PP_areal_days, n_datadt_analysis, nregions, rho_timeavg)
     ! call write_rhodomain_timeavg2(rho_timeavg, &
     ! trim(path_output) // 'rho_slab2_domain_timeavg.csv')
-
-
 
 
 end program recycling

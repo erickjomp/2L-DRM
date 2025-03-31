@@ -49,11 +49,12 @@ MODULE global_data
     integer, save :: delta_write_paths! = 1
     integer, save :: ij0_write_paths! = 1
     logical, save :: write_rhocolumn_grid
-
+    integer, save :: nslabs 
+    
     ! writing options
     ! logical, save :: write_trajectories = .true.
     integer, save :: NAN_value=-9.99E8 ! DONT MODIFY
-    integer, save :: nslabs = 2  ! DONT MODIFY
+    ! integer, save :: nslabs = 2  ! DONT MODIFY
     integer       :: nbytes_real = 4
 
     !!!!! derived variables 
