@@ -316,7 +316,7 @@ contains
 
         call cli%add(switch='--solver', &
                 switch_ab='-s',    &
-                help='Enter 1 to solve differential equation analitically or 2 for solving with finite diferences. ',   &
+                help='Enter 1 to solve differential equation analitically or 3 for solving with finite diferences without tracing dt refining.',   &
                 required=.false.,   &
                 act='store',       &
                 def = '1',       &
@@ -335,7 +335,7 @@ contains
 
         call cli%add(switch='--data_dt', &
                     switch_ab='-ddt',    &
-                    help='PP, PW, ET dt. In hours',   &
+                    help='PP, PW, ET, PW, PWflux dt. In hours',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -343,7 +343,8 @@ contains
 
         call cli%add(switch='--UV_dt', &
                     switch_ab='-udt',    &
-                    help='Optional. Wind speed dt. In hours. Must be a divisor of data_dt (in hours)',   &
+                    help='Optional. Wind speed dt. In hours. Must be a divisor of data_dt (in hours). &
+                         & If not provided, it takes the same value as --data_dt',   &
                     required=.false.,   &
                     act='store',       &
                     def='0',           &
@@ -363,7 +364,8 @@ contains
 
         call cli%add(switch='--writepaths', &
                 switch_ab='-wp',    &
-                help='Write paths of backtracing. .false. for deactivating it, .true. for activating it. Default .false.',   &
+                help='Write paths of backtracing. Enter .true. for activating it. The default is .false.  .&
+                     & It may not work when parallelization is activated. ',   &
                 required=.false.,   &
                 act='store',       &
                 def='.false.',           &
