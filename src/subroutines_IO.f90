@@ -11,8 +11,10 @@ contains
 
         type(command_line_interface)                 :: cli    ! Command Line Interface (CLI).
         integer                                      :: error_cli
-        character(len=19)                            :: datetime0_str  
-
+        character(len=19)                            :: datetime0_str, datetime1_str, datetime2_str
+        type(datetime)                               :: datetime2
+        type(timedelta)                              :: td
+        logical                                      :: is_passed
         ! bigx=1471 !253 ! 1471 !1471  !number of grids in x and y direction
         ! bigy=2027 !346 ! 2027 ! 2027
         ! n_datadt= 488 !196 ! 120+15 months-01to04 no leapyear ! 123+15  months-05to08  ! 122+15  months-09to12   ! CHANGE ! it seems it no longer affects
@@ -210,13 +212,13 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
-        call cli%add(switch='--n_datadt', &
-                    switch_ab='-nt',    &
-                    help='Number of time steps data_dt in data',   &
-                    required=.true.,   &
-                    act='store',       &
-                    error=error_cli)
-        if (error_cli/=0) stop   
+        ! call cli%add(switch='--n_datadt', &
+        !             switch_ab='-nt',    &
+        !             help='Number of time steps data_dt in data',   &
+        !             required=.true.,   &
+        !             act='store',       &
+        !             error=error_cli)
+        ! if (error_cli/=0) stop   
 
         call cli%add(switch='--dx', &
                     switch_ab='-dx',    &
@@ -234,22 +236,43 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
-        call cli%add(switch='--t_data_start', &
-                    switch_ab='-t1',    &
-                    help='Day 1 of analysis. Since there should be some days for backtracing, it cant be 1.',   &
+        ! call cli%add(switch='--t_data_start', &
+        !             switch_ab='-t1',    &
+        !             help='Day 1 of analysis. Since there should be some days for backtracing, it cant be 1.',   &
+        !             required=.true.,   &
+        !             act='store',       &
+        !             error=error_cli)
+        ! if (error_cli/=0) stop   
+        call cli%add(switch='--datetime_start', &
+                    switch_ab='-d1',    &
+                    help='Initial datetime of analysis (i.e. First datetime for which backtracing trajectory will be calculated). &
+                             &Since there should be some days for backtracing, it cant be the same same as datetime0.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop   
+        
 
-        call cli%add(switch='--t_data_end', &
-                    switch_ab='-t2',    &
-                    help='Final day of analysis. Optional, if not provided, it will be the total number of days',   &
-                    required=.false.,   &
+        ! call cli%add(switch='--t_data_end', &
+        !             switch_ab='-t2',    &
+        !             help='Final day of analysis. Optional, if not provided, it will be the total number of days',   &
+        !             required=.false.,   &
+        !             act='store',       &
+        !             def='0',           &
+        !             error=error_cli)
+        ! if (error_cli/=0) stop   
+        call cli%add(switch='--datetime_end', &
+                    switch_ab='-d2',    &
+                    ! help='Final datetime of analysis. Optional, if not provided, the final datetime of analysis will correspond&
+                    ! & to the last datetime of the data.',   &
+                    help='Final datetime of analysis. Does not have to match the maximum datetime present in the data &
+                    &(length of data),&
+                    & but it has to be equal or lower.',  &
+                    required=.true.,   &   ! this should be optional. so if no present just count until the maximum
                     act='store',       &
-                    def='0',           &
+                    ! def='0',           &
                     error=error_cli)
-        if (error_cli/=0) stop   
+        if (error_cli/=0) stop  
 
         call cli%add(switch='--datetime0', &
                 switch_ab='-d0',    &
@@ -316,7 +339,8 @@ contains
 
         call cli%add(switch='--solver', &
                 switch_ab='-s',    &
-                help='Enter 1 to solve differential equation analitically or 3 for solving with finite diferences without tracing dt refining.',   &
+                help='Enter 1 to solve differential equation analitically or 3 for solving with finite diferences without tracing &
+                     &dt refining.', &
                 required=.false.,   &
                 act='store',       &
                 def = '1',       &
@@ -431,13 +455,23 @@ contains
         ! if (error_cli/=0) stop   
 
 
-        call cli%add(switch='--writerhocolumn_grid', &
-                switch_ab='-wrc',    &
+        call cli%add(switch='--writerhogrid', &
+                switch_ab='-wr',    &
                 help='Write rho column grid, with dimensions (time, regions, ny, nx). &
                         & Not recommended when having many regions.', &
                 required=.false.,   &
                 act='store',       &
                 def='.false.',           &
+                error=error_cli)
+        if (error_cli/=0) stop   
+
+        call cli%add(switch='--writerhogrid_option', &
+                switch_ab='-wro',    &
+                help='Use option 2 to write rho column grid separated by months. &
+                      &Option 1 (default) writes everything to 1 file.', &
+                required=.false.,   &
+                act='store',       &
+                def='1',           &
                 error=error_cli)
         if (error_cli/=0) stop   
 
@@ -533,22 +567,59 @@ contains
         if (error_cli/=0) stop
         call cli%get(switch='-ny', val=bigy, error=error_cli)
         if (error_cli/=0) stop
-        call cli%get(switch='-nt', val=n_datadt, error=error_cli)
-        if (error_cli/=0) stop
+        ! call cli%get(switch='-nt', val=n_datadt, error=error_cli)
+        ! if (error_cli/=0) stop
         call cli%get(switch='-dx', val=dx, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-dy', val=dy, error=error_cli)
         if (error_cli/=0) stop
 
-        call cli%get(switch='-t1', val=t_data_start, error=error_cli)
+        call cli%get(switch='-ddt', val=data_dt, error=error_cli)
         if (error_cli/=0) stop
-        call cli%get(switch='-t2', val=t_data_end, error=error_cli)
+        call cli%get(switch='-udt', val=UV_dt, error=error_cli)
         if (error_cli/=0) stop
-        if (t_data_end == 0)  t_data_end = n_datadt
+        if (UV_dt .eq. 0) then
+            UV_dt = data_dt
+        end if
+
+
+
         call cli%get(switch='-d0', val=datetime0_str, error=error_cli)
         if (error_cli/=0) stop
         datetime0 = strptime(datetime0_str,"%Y-%m-%d_%H:%M:%S")
         ! print *, datetime0 % isoformat()
+
+        ! call cli%get(switch='-t1', val=t_data_start, error=error_cli)
+        ! if (error_cli/=0) stop
+        call cli%get(switch='-d1', val=datetime1_str, error=error_cli)
+        if (error_cli/=0) stop
+        datetime1 = strptime(datetime1_str,"%Y-%m-%d_%H:%M:%S")
+        td = datetime1 - datetime0
+        t_data_start = 1 + td%total_seconds() / (data_dt*60*60)
+        ! print *, "#############    t1 = ",t_data_start, "##############"
+
+        ! call cli%get(switch='-t2', val=t_data_end, error=error_cli)
+        ! if (error_cli/=0) stop
+        ! if (t_data_end == 0)  t_data_end = n_datadt
+        call cli%get(switch='-d2', val=datetime2_str, error=error_cli)
+        if (error_cli/=0) stop
+        datetime2 = strptime(datetime2_str,"%Y-%m-%d_%H:%M:%S")
+        td = datetime2 - datetime0
+        t_data_end = 1 + td%total_seconds() / (data_dt*60*60)
+        ! is_passed = cli%is_passed(switch='-d2')
+        ! if (is_passed) then
+        !     call cli%get(switch='-d2', val=datetime2_str, error=error_cli)
+        !     if (error_cli/=0) stop
+        !     datetime2 = strptime(datetime2_str,"%Y-%m-%d_%H:%M:%S")
+        !     td = datetime2 - datetime0
+        !     t_data_end = 1 + td%total_seconds() / (data_dt*60*60)
+        !     ! if (t_data_end == 0)  t_data_end = n_datadt
+        ! else
+        !     t_data_end = n_datadt
+        ! end if
+
+
+
 
         call cli%get(switch='-ds', val=domsize, error=error_cli)
         if (error_cli/=0) stop
@@ -570,13 +641,7 @@ contains
         if (error_cli/=0) stop
 
 
-        call cli%get(switch='-ddt', val=data_dt, error=error_cli)
-        if (error_cli/=0) stop
-        call cli%get(switch='-udt', val=UV_dt, error=error_cli)
-        if (error_cli/=0) stop
-        if (UV_dt .eq. 0) then
-            UV_dt = data_dt
-        end if
+
         call cli%get(switch='-ver', val=verbose, error=error_cli)
         if (error_cli/=0) stop
         call cli%get(switch='-wp', val=write_paths, error=error_cli)
@@ -587,7 +652,9 @@ contains
         if (error_cli/=0) stop
         call cli%get(switch='-wp0', val=ij0_write_paths, error=error_cli)
         if (error_cli/=0) stop
-        call cli%get(switch='-wrc', val=write_rhocolumn_grid, error=error_cli)
+        call cli%get(switch='-wr', val=write_rho_grid, error=error_cli)
+        if (error_cli/=0) stop
+        call cli%get(switch='-wro', val=write_rho_grid_option, error=error_cli)
         if (error_cli/=0) stop
 
 
@@ -737,8 +804,10 @@ contains
     subroutine allocate_global_arrays(i_file, min_day_array, newday1, max_day_array)
         use global_data
         integer, intent(out)  :: newday1
-        integer, intent(out) :: min_day_array, max_day_array
-        integer, intent(in) :: i_file
+        integer, intent(inout):: max_day_array
+        integer, intent(out)  :: min_day_array
+        integer, intent(in)   :: i_file
+        logical, save         :: is_first_readfile = .true.
 
         integer           :: n_datadt_file
         integer           :: max_day_array_old
@@ -751,19 +820,35 @@ contains
         
 
 
-        if (i_file == 1) then
-            allocate(PP(bigx,bigy,n_datadt_file))
-            allocate(ET(bigx,bigy,n_datadt_file))
-            allocate(PW(bigx,bigy,nslabs,n_datadt_file))
-            allocate(U3(bigx,bigy,nslabs, n_datadt_file* data_dt/UV_dt))     
-            allocate(V3(bigx,bigy,nslabs, n_datadt_file* data_dt/UV_dt))
-            allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
-            allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
-            max_day_array = n_datadt_file
-            ! not necessary, but provided
-            newday1 = 1
-            min_day_array = 1
-            ! end not necessary
+        if (is_first_readfile) then
+            if (i_file == 1) then
+                allocate(PP(bigx,bigy,n_datadt_file))
+                allocate(ET(bigx,bigy,n_datadt_file))
+                allocate(PW(bigx,bigy,nslabs,n_datadt_file))
+                allocate(U3(bigx,bigy,nslabs, n_datadt_file* data_dt/UV_dt))     
+                allocate(V3(bigx,bigy,nslabs, n_datadt_file* data_dt/UV_dt))
+                allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
+                allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt_file))
+                max_day_array = n_datadt_file
+                ! not necessary, but provided
+                newday1 = 1
+                min_day_array = 1
+                ! ! end not necessary
+            else
+                allocate(PP(bigx,bigy,max_day_array+1:max_day_array+n_datadt_file))
+                allocate(ET(bigx,bigy,max_day_array+1:max_day_array+n_datadt_file))
+                allocate(PW(bigx,bigy,nslabs,max_day_array+1:max_day_array+n_datadt_file))
+                allocate(U3(bigx,bigy,nslabs, (max_day_array)* data_dt/UV_dt + 1: (max_day_array + n_datadt_file)* data_dt/UV_dt))     
+                allocate(V3(bigx,bigy,nslabs, (max_day_array)* data_dt/UV_dt + 1: (max_day_array + n_datadt_file)* data_dt/UV_dt))
+                allocate(PW_FLUX(bigx,bigy,nslabs-1,max_day_array+1:max_day_array+n_datadt_file))
+                allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,max_day_array+1:max_day_array+n_datadt_file))
+                max_day_array = max_day_array + n_datadt_file
+                ! not necessary, but provided
+                newday1 = max_day_array+1
+                min_day_array = max_day_array+1
+                ! end not necessary
+            end if
+            is_first_readfile = .false.
         else 
             max_dt_array = max_day_array * data_dt/ UV_dt
 
@@ -816,17 +901,32 @@ contains
     end function
 
     subroutine check_and_update_globalarrays(day, max_iday_array, i_file)
+        use global_data, only :    n_datadt_tracing
         integer, intent(in)     :: day
         integer, intent(inout)     :: max_iday_array
         integer, intent(inout)     :: i_file
         integer                    :: min_iday_array, newday1
+        integer                    :: n_datadt_file
+
 
         do while (day > max_iday_array) !then
             i_file = i_file + 1
             print *,'Reading data from files', i_file
+            n_datadt_file = get_n_datadt_file_PP(i_file)
+
+            if ((max_iday_array + n_datadt_file) < (day - n_datadt_tracing)) then  ! to not load dataset if not necessary
+                if (i_file == 1) then
+                    max_iday_array = n_datadt_file
+                else
+                    max_iday_array = max_iday_array + n_datadt_file
+                end if
+                
+                cycle
+            end if
+
             call allocate_global_arrays(i_file,min_iday_array, newday1, max_iday_array)
             ! print *,"min_day_array= ",min_iday_array
-            print *,"max_day_array= ",max_iday_array
+            print *,"max_datadt_array= ",max_iday_array
             ! print *, "newday1 = ",newday1
             call read_data(newday1, i_file)  
             ! print *, "newday1 = ",newday1
@@ -864,9 +964,10 @@ contains
                                 UV_dt, data_dt, nslabs
         USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE, ieee_quiet_nan, ieee_value, IEEE_IS_NAN  ! for TEMPORAL SOLUTIOM
 
-        integer, intent(in)  :: day, i_file
-        integer :: i,j,k
-        integer :: i_dt
+        integer, intent(in)   :: day, i_file
+        integer               :: i,j,k
+        integer               :: i_dt
+        logical, save         :: is_first_readfile = .true.
         ! START REMOVE
         ! TEMPORAL SOLUTION
         integer  :: max_datadt_array, min_datadt_array,i_datadt
@@ -878,7 +979,8 @@ contains
 
         ! call cpu_time(startTime)
         open(10, file = file_PP(i_file), status='old',form='unformatted',access='stream')
-        if (i_file == 1) then
+        ! if (i_file == 1) then
+        if (is_first_readfile) then
             read(10) PP
             close(10)
         else
@@ -889,7 +991,8 @@ contains
 
         
         open(10, file = file_ET(i_file), status='old',form='unformatted',access='stream')
-        if (i_file == 1) then
+        ! if (i_file == 1) then
+        if (is_first_readfile) then
             read(10) ET
             close(10)
         else
@@ -918,7 +1021,8 @@ contains
         ! print *, "Total time new: ", stopTime - startTime
 
         open(10,  file = file_PW(i_file), status='old',form='unformatted',access='stream')
-        if (i_file == 1) then
+        ! if (i_file == 1) then
+        if (is_first_readfile) then
             read(10) PW
             close(10)
         else
@@ -948,7 +1052,8 @@ contains
         ! END REMOVE
 
         open(10,  file = file_U3(i_file), status='old',form='unformatted',access='stream')
-        if (i_file == 1) then
+        ! if (i_file == 1) then
+        if (is_first_readfile) then
             read(10) U3
             close(10)
         else
@@ -959,7 +1064,8 @@ contains
 
 
         open(10,  file = file_V3(i_file), status='old',form='unformatted',access='stream')
-        if (i_file == 1) then
+        ! if (i_file == 1) then
+        if (is_first_readfile) then
             read(10) V3
             close(10)
         else
@@ -970,7 +1076,8 @@ contains
 
 
         open(10,  file = file_PWflux(i_file), status='old',form='unformatted',access='stream')
-        if (i_file == 1) then
+        ! if (i_file == 1) then
+        if (is_first_readfile) then
             read(10) PW_FLUX
             close(10)
         else
@@ -979,7 +1086,9 @@ contains
             close(10)
         end if
 
-
+        if (is_first_readfile) then
+            is_first_readfile = .false.
+        end if
         ! print *, U3(30,100,25,1)
 
     end subroutine
@@ -1328,38 +1437,69 @@ contains
     end subroutine
 
 
-    subroutine write_rhocolumn_grid_sr(rhocolumn)
+    subroutine write_rho_grid_sr(rhocolumn, datetime_c)
         
         use global_data, only:   t_data_start, t_data_end, nregions, domain_ij, &
-                                 domsize, bigx, bigy, file_rhocolumn_grid
+                                 domsize, bigx, bigy, file_rhocolumn_grid, write_rho_grid_option, &
+                                 filename_rhocolumn_grid_base, data_dt, filename_rhocolumn_grid, &
+                                 path_output, prefix_outfiles
+
         use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
         use, intrinsic :: iso_fortran_env, only: real32
+        use datetime_module
         implicit none
         ! real(real32) :: nan
-        real(4)        :: nan        
-        logical, save            :: first_time = .true.
-        integer(4), save         :: count, i, j, i_reg, k
-        real(4), dimension(nregions,domsize)   :: rhocolumn
-        real(4), dimension(bigx, bigy, nregions)   :: rhocolumn_grid
+        real(4)                                           :: nan        
+        logical, save                                     :: first_time = .true.
+        integer(4), save                                  :: count, i, j, i_reg, k
+        real(4), dimension(nregions,domsize),intent(in)   :: rhocolumn
+        real(4), dimension(bigx, bigy, nregions)          :: rhocolumn_grid
+        type(datetime), intent(in)                        :: datetime_c
+        type(datetime)                                    :: datetime2
+        integer, save                                     :: ndays_month, year, month
+        integer,save                                      :: old_month = 0
 
         nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
+        ! old_month = 0
+        if (write_rho_grid_option == 2) then
+            
+            month = datetime_c%getMonth()
+            
+            if (old_month .ne. month) then
+                year = datetime_c%getYear()
+                ndays_month = daysInMonth(month, year)
+                datetime2 = datetime_c + timedelta(hours = ndays_month * 24  - data_dt)
+
+                first_time = .true.
+                
+                filename_rhocolumn_grid = trim(filename_rhocolumn_grid_base) // "_" // &
+                                         datetime_c%strftime("%Y-%m-%dT%H:%M:%S") // "_TO_" // &
+                                         datetime2%strftime("%Y-%m-%dT%H:%M:%S") // ".dat"
+                filename_rhocolumn_grid = trim(prefix_outfiles) // filename_rhocolumn_grid
+                file_rhocolumn_grid = trim(path_output) // "/" // filename_rhocolumn_grid
+            end if
+
+            old_month = month
+        end if
+
+
 
         rhocolumn_grid = nan
         do i_reg = 1,nregions
             do k = 1, domsize
                 i=domain_ij(k,1)
                 j=domain_ij(k,2) 
-                rhocolumn_grid(i,j,i_reg) = rhocolumn(i_reg, k)
+                rhocolumn_grid(i,j,i_reg) = rhocolumn(i_reg, k)  
 
-                
-                if ((count == t_data_start + 30 - 1) .and. i == 51 .and. j == 48) then
-                    print *, "count = ", count
-                    print *, "rho = ", rhocolumn_grid(51,48,1)
-                    print *, "k = ", k
-                end if
-        
+                ! if ((count == t_data_start + 30 - 1) .and. i == 51 .and. j == 48) then
+                !     print *, "count = ", count
+                !     print *, "rho = ", rhocolumn_grid(51,48,1)
+                !     print *, "k = ", k
+                ! end if
             end do
         end do
+
+
 
         if (first_time) then
             open(120, file = file_rhocolumn_grid, access = "STREAM",&
@@ -1377,6 +1517,9 @@ contains
             close(120) 
         end if
 
+        
+
+
     end subroutine
 
 
@@ -1393,7 +1536,7 @@ contains
         logical, save            :: first_time = .true.
         integer(4), save         :: count
         integer(4)               :: i, j, i_reg, k, islab
-        real(4), dimension(nregions,domsize, nslabs)   :: rhoslabs
+        real(4), dimension(nregions,domsize, nslabs)       :: rhoslabs
         real(4), dimension(bigx, bigy, nslabs, nregions)   :: rhoslabs_grid
 
         nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
@@ -1405,7 +1548,7 @@ contains
                     i=domain_ij(k,1)
                     j=domain_ij(k,2) 
                     ! if (.not. isnan(rhoslabs(i_reg, k,islab))) then
-                        rhoslabs_grid(i,j,islab,i_reg) = rhoslabs(i_reg, k,islab)
+                    rhoslabs_grid(i,j,islab,i_reg) = rhoslabs(i_reg, k,islab)
                     ! end if
                 end do
             end do
@@ -1428,5 +1571,8 @@ contains
         end if
 
     end subroutine
+
+
+
 
 END MODULE subroutines_IO

@@ -27,7 +27,7 @@ MODULE global_data
     !__________________________starting dates and ending dates,core region
     integer, save :: t_data_start, t_data_end!= 123+15 !196  !123+15  !day1=16, day2=   !date starts and ends simulation
     ! character(len=19), save    :: datetime0_str
-    type(datetime),save :: datetime0
+    type(datetime),save :: datetime0, datetime1
     integer, save :: domsize!=49509  !1386 nonCPM  !49509 CPM !49509  !number of grids within the monsoon region
     integer, save :: nregions != 8  ! 83148 cells landocean CPM  ! 31774 cells land CPM ! 8    !number of regions in map file    ! CHANGE 
     !______________________________________________________________________
@@ -48,7 +48,8 @@ MODULE global_data
     integer, save :: step_write_paths
     integer, save :: delta_write_paths! = 1
     integer, save :: ij0_write_paths! = 1
-    logical, save :: write_rhocolumn_grid
+    logical, save :: write_rho_grid
+    integer, save :: write_rho_grid_option
     integer, save :: nslabs 
     
     ! writing options
@@ -98,6 +99,7 @@ MODULE global_data
     character(len=100), save     :: filename_precipareal_domain_daily = 'precipareal_domain_daily.csv'
     character(len=100), save     :: filename_paths_xy = "paths_xy.csv"
     character(len=100), save     :: filename_rhocolumn_grid = "rho_grid.dat"
+    character(len=100), save     :: filename_rhocolumn_grid_base = "rho_grid"
     character(len=100), save     :: filename_rhoslabs_grid = "rhoslabs_grid.dat"
     ! character(len=50), save     :: filename_rhoslabs_domain_timeavg = 'rho_slabs_domain_timeavg.csv'
     

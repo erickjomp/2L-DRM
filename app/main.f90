@@ -7,6 +7,10 @@ program recycling
 
     USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE
     USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_NAN
+    ! use, intrinsic :: iso_fortran_env, only : stdin=>input_unit, &
+    !                                       stdout=>output_unit, &
+    !                                       stderr=>error_unit
+    ! https://stackoverflow.com/questions/8508590/standard-input-and-output-units-in-fortran-90
 
     implicit none
 
@@ -78,11 +82,11 @@ program recycling
     end if
 
 
-    print * ,"Verbose mode is actived:", verbose
+    write (*,*) "Verbose mode is actived:", verbose
     ! start the daily loop during the chosen duration from day1 to day2
-    print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    print *,'!!!  Daily Loop Starts  !!!'
-    print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    write (*,*)  '!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    write (*,*)  '!!!  Daily Loop Starts  !!!'
+    write (*,*) '!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     daily : do t_data = t_data_start, t_data_end
         
         
@@ -90,8 +94,9 @@ program recycling
         i_UVdt = t_data * (data_dt/UV_dt)
 
         datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
-        print *, datetime_c%isoformat(' '), "    | time step = ",t_data
-        print *, "----"
+        ! print stdout,"------ ", datetime_c%isoformat(' '), "    | time step = ",t_data, " ------"
+        write (*,*) "------ ", datetime_c%isoformat(' '), "    | time step = ",t_data, " ------"
+        ! print *, "----"
 
         call get_PP_domain(t_data, PP_domain)
         call get_PW_domain(t_data, PW_domain)
@@ -144,16 +149,17 @@ program recycling
             !                             rho_domain(:,islab,t_data-t_data_start+1))  ! outputs
             call calculate_areal_rho(rho(:,:,islab), PP_domain, domsize, nregions,&
                                         rho_domain(:,islab,t_data-t_data_start+1))  ! outputs
-            if (verbose)  print * ,"slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
+            ! if (verbose)  print * ,"slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
+            if (verbose)  write(*,'(A, I1, A, *(XX,F4.3))')  "slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
 
         end do
 
         call calculate_column_rho(rho, PW_domain, domsize, nregions, nslabs, &
                                 rhocolumn, .false.)
 
-        if (write_rhocolumn_grid) then
-            call write_rhocolumn_grid_sr(rhocolumn)
-            call write_rhoslabs_grid_sr(rho)
+        if (write_rho_grid) then
+            call write_rho_grid_sr(rhocolumn, datetime_c)
+            ! call write_rhoslabs_grid_sr(rho)
         end if
 
 
@@ -166,7 +172,10 @@ program recycling
         !                          sum(PW_domain, dim = 2, mask = .not. isnan(PW_domain)),&
         !                          domsize, nregions,&
         !                          rhocolumn_domain(:,t_data-t_data_start+1))  
-        if (verbose)  print *, "column    ", "   "," : ", rhocolumn_domain(:, t_data-t_data_start+1)
+        ! if (verbose)  print *, "column    ", "   "," : ", rhocolumn_domain(:, t_data-t_data_start+1)
+        
+        ! if (verbose)  write(*,'(A, A, *(XX,"0",F4.3))')  "column ", " : ", rhocolumn_domain(:, t_data-t_data_start+1)
+        if (verbose)  write(*,'(A, A, *(XX,F4.3))')  "column", " : ", rhocolumn_domain(:, t_data-t_data_start+1)
 
         PP_areal_days(t_data-t_data_start+1) = sum(PP_domain) /size(PP_domain)    
                   
@@ -180,8 +189,9 @@ program recycling
 
     call average_in_time(rhocolumn_domain, PP_areal_days, n_datadt_analysis, nregions, rho_timeavg)
 
-    print *,"rho - time averaged :"
-    if (verbose)   print *, rho_timeavg
+    ! print stdout,"rho - time averaged :"
+    write (*,*)   "rho - time averaged :"
+    if (verbose)   write(*,"(*(XX,F4.3))") rho_timeavg
     call write_rhodomain_timeavg(rho_timeavg)
 
     call write_precipareal_daily(PP_areal_days)
