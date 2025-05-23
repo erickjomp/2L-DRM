@@ -2,9 +2,6 @@
 
 <!-- ![2L-DRM trajectories for a specific day](trajectories_example.png  "2L-DRM trajectores for a specific day"){width=125} -->
 
-<video width="320" height="240" controls>
-  <source src="animation_continental.mp4" type="video/mp4">
-</video>
 
 <p align="center">
   <img src="trajectories_example.png" alt="2L-DRM trajectories for a specific day" width="300" >
