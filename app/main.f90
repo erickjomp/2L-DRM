@@ -4,7 +4,9 @@ program recycling
     USE subroutines_IO
     USE subroutines_tracing
     USE subroutines_process
-
+#ifdef _OPENMP
+    USE omp_lib
+#endif
     USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE
     USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_NAN
     ! use, intrinsic :: iso_fortran_env, only : stdin=>input_unit, &
@@ -40,6 +42,7 @@ program recycling
     integer       :: ii,jj,i_celldomain,i_region, i_section, i_point
     logical       :: found, verbose2
     integer       :: i_path
+    integer       :: tid,nthreads
     ! END REMOVE
 
     call read_global_data()
@@ -107,16 +110,27 @@ program recycling
             ! start the domain loop
 
             !$OMP PARALLEL DO PRIVATE(i,j,path_xy,path_ij,length_path,path_uv, &
-            !$OMP                     path_sections, n_sections, verbose2)
+            !$OMP                     path_sections, n_sections, verbose2,tid,nthreads)
             domain : do k=1,domsize 
+#ifdef _OPENMP
+                tid = omp_get_thread_num()
+                nthreads = omp_get_num_threads()
+#endif
+                ! tid = omp_get_thread_num()
+                ! nthreads = omp_get_num_threads()
                 i=domain_ij(k,1)
                 j=domain_ij(k,2)
 
                 call tracing_from_ij(i,j, islab, i_UVdt, option_next_point, &
                                     path_xy, path_ij, length_path, path_uv) ! outputs
 
+#ifdef _OPENMP
+                if (write_paths)  call write_path(path_xy, length_path, islab, t_data, k, step_write_paths, datetime_c,&
+                                                      tid, nthreads)
+#else
                 if (write_paths)  call write_path(path_xy, length_path, islab, t_data, k, step_write_paths, datetime_c)
-                
+#endif
+
                 call identify_path_sections(path_ij,length_path, &
                                             path_sections, n_sections)  ! outputs
                 

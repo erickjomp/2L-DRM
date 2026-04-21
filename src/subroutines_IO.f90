@@ -1358,7 +1358,7 @@ contains
     end subroutine
 
     ! step: every how many timesteps of the tracing_dt, it will be written
-    subroutine write_path(path_xy, length_path, islab, t_data, k, step,datetime0)
+    subroutine write_path(path_xy, length_path, islab, t_data, k, step,datetime0, id_thread, n_threads)
         use global_data, only:   t_data_start, t_data_end, file_paths_xy, domain_ij, delta_write_paths, &
                                  ij0_write_paths, tracing_dt
         use datetime_module
@@ -1368,8 +1368,31 @@ contains
         integer                  :: i_point
         logical                  :: status_ok
         logical, save            :: first_time = .true.
+        !$omp threadprivate(first_time)
         type(datetime)           :: datetime0, datetime_tr
         type(csv_file),save      :: fpaths
+        !$omp threadprivate(fpaths)
+        integer, intent(in), optional :: id_thread, n_threads
+        integer                  :: id_thread_value, n_threads_value
+        character(200)           :: file_paths_xy_value
+
+        if(present(id_thread)) then
+            id_thread_value = id_thread
+        else 
+            id_thread_value = 0
+        end if
+
+        if(present(n_threads)) then
+            n_threads_value = n_threads
+        else 
+            n_threads_value = 1
+        end if
+
+        if (n_threads_value > 1) then
+            file_paths_xy_value = add_thread_suffix(file_paths_xy, id_thread_value, n_threads_value)
+        else 
+            file_paths_xy_value = file_paths_xy
+        end if
 
         if (delta_write_paths  /= 1 ) then
             if ((mod(domain_ij(k,1) - ij0_write_paths, delta_write_paths) /=0) .or. &
@@ -1383,21 +1406,21 @@ contains
         call fpaths%initialize(verbose = .true., enclose_strings_in_quotes = .false.)
         ! open the file
         if (first_time) then
-            call fpaths%open(file_paths_xy,n_cols=7,&
+            call fpaths%open(file_paths_xy_value,n_cols=7,&
                         status_ok=status_ok) ! default REPLACe not append, append=.true. for appending 
+            call fpaths%add("dt_data_start")
+            call fpaths%add("datetime")
+            call fpaths%add("slab")
+            call fpaths%add("point")
+            call fpaths%add(["k","X","Y"])
+            call fpaths%next_row()
             first_time = .false.
         else
-            call fpaths%open(file_paths_xy,n_cols=7,&
+            call fpaths%open(file_paths_xy_value,n_cols=7,&
                         status_ok=status_ok, append = .true.) ! default REPLACe not append, append=.true. for appending 
         end if
         ! add header
         ! call fpaths%add(["t_data_start","datetime", "slab","point","k","X","Y"])
-        call fpaths%add("dt_data_start")
-        call fpaths%add("datetime")
-        call fpaths%add("slab")
-        call fpaths%add("point")
-        call fpaths%add(["k","X","Y"])
-        call fpaths%next_row()
         
         
         ! if (first_time) then
@@ -1409,13 +1432,7 @@ contains
         !     ! open(151, file = file_paths_xy, status = "OLD", position = "APPEND")
         ! end if
 
-        do i_point = 1, length_path
-            if ((t_data >= 32) .and. (t_data <= 38)) then
-              ! nothing
-            else 
-                cycle
-            end if
-            
+        do i_point = 1, length_path            
             if (mod(i_point-1, step) == 0) then
                 ! write(10, "(I6,',',I4, ', ', I5, ', ', I6 ,', ', F12.2, ', ', F12.2)")  &
                 !                 iday, datetime_tr%strftime("%Y-%m-%dT%H:%M:%S"), islab, i_point, k, path_xy(1, i_point), path_xy(2, i_point)
@@ -1574,5 +1591,38 @@ contains
 
 
 
+    function itoa(i) result(str)
+        integer, intent(in) :: i
+        character(len=32) :: str
+        write(str, '(I0)') i
+    end function
+
+    function add_thread_suffix(fname, tid, nthreads) result(out)
+        implicit none
+        character(len=*), intent(in) :: fname
+        integer, intent(in) :: tid, nthreads
+        character(len=:), allocatable :: out
+
+        integer :: pos, width
+        character(len=32) :: numstr, suffix
+
+        width = len_trim(adjustl(itoa(nthreads)))
+
+        write(numstr, '(I0)') tid
+
+        ! zero padding manually
+        numstr = adjustl(numstr)
+        numstr = repeat('0', max(0, width - len_trim(numstr))) // trim(numstr)
+
+        suffix = "_THREAD" // trim(numstr)
+
+        pos = index(trim(fname), ".", back=.true.)
+
+        if (pos > 0) then
+            out = fname(:pos-1) // trim(suffix) // fname(pos:)
+        else
+            out = trim(fname) // trim(suffix)
+        end if
+    end function
 
 END MODULE subroutines_IO
