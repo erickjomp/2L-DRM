@@ -56,10 +56,10 @@ contains
     
     subroutine calculate_column_rho(rho,PW_domain, size, n_rhos, nslabs, rho_average, verbose)
         USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY: IEEE_IS_FINITE
+        integer, intent(in)                                   :: size, n_rhos, nslabs
         real(4), dimension(n_rhos, size, nslabs), intent(in)  :: rho
         real(4), dimension(size, nslabs), intent(in)          :: PW_domain
-        real(4), dimension(n_rhos, size), intent(out)         :: rho_average                   
-        integer, intent(in)                                   :: size, n_rhos, nslabs
+        real(4), dimension(n_rhos, size), intent(out)         :: rho_average
         integer                                               :: k, islab, i_rho
         real(4), dimension(nslabs)                            :: PW_values
         real(4), dimension(nslabs)                            :: PWflux_values
