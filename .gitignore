@@ -1,1 +1,3 @@
-.mod
+*.mod
+build.sh
+install.sh
