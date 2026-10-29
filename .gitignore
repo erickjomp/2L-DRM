@@ -1,4 +1,7 @@
 *.mod
 build.sh
 install.sh
+install_release.sh
 build*/
+__pycache__/
+.pytest_cache/

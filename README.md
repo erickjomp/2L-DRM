@@ -50,6 +50,16 @@ Then you will be able to call the program `run2LDRM` from any directory. For a l
     run2LDRM --help
 
 
+## Testing
+
+Regression tests run the model on a small case (32 x 26 cells, 7 days) coarsened from a 4 km CPM simulation over the Amazon. They compare the outputs with stored reference results, and check that 1 and 4 OpenMP threads give identical results. They need Python 3 and [pytest](https://pytest.org):
+
+    fpm build
+    python3 -m pytest test/regression --exe $(fpm run run2LDRM --runner echo | tail -1)
+
+Add `--compiler ifx` (or another compiler) and/or `--profile release` to both fpm commands to test a different build. A failure means the results changed, not necessarily that they are wrong. If a change in results is intended, regenerate the references with `--update-reference` and commit them. The test also runs automatically on GitHub Actions with gfortran and ifx for every push and pull request. See `test/regression/make_coarse_case.py` for how the test case was built.
+
+
 ## Notes
 - The data in the input binary files of run2LDRM program should be in Fortran-like memory order (read more about it here https://manik.cc/2021/02/25/memory-order.html). As a rule of thumb, if you want an input binary file with dimensions (nx, ny, nslabs, ntimes) and you are going to write it from a Python numpy array, the numpy array must have dimensions (ntimes, nslabs, ny, nx), where nslabs should be 2.
 - The precipitable water flux at the interslab (PWflux), which has to be provided as an input binary file, can be calculated by $\rho_{air} w_{wind} q$, where $\rho_{air}$ is the density of the air, $w_{wind}$ is the vertical wind velocity and $q$ is the specific humidity at the interslab pressure level.

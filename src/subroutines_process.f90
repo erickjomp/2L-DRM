@@ -640,7 +640,7 @@ contains
         PWsum = sum(PW_values, mask = .NOT.(isnan(PW_values)))
           
 
-        !!!! UPDATE !!!!\
+        !!!! UPDATE !!!!
         mask1 = MASK_TOPO(i, j, 1) 
         mask2= MASK_PW_FLUX(i, j, 1, i_datadt)
         
@@ -685,7 +685,7 @@ contains
 
         PWsum = sum(PW_values, mask = .NOT.(isnan(PW_values)))
           
-        !!!! UPDATE !!!!\
+        !!!! UPDATE !!!!
         mask1 = MASK_TOPO(i, j, 1) 
         mask2= MASK_PW_FLUX(i, j, 1, i_datadt)
         

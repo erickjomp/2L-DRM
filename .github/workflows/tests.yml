@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - {compiler: gcc, version: 13}
+          - {compiler: intel, version: '2025.0'}
+        profile: [debug, release]
+    env:
+      FPM_OPTS: --profile ${{ matrix.profile }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: fortran-lang/setup-fortran@v1
+        id: setup-fortran
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Install fpm and pytest
+        run: pip install fpm==0.10.1 pytest
+
+      - name: Build
+        run: fpm build $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }}
+
+      - name: Regression test
+        run: |
+          exe=$(fpm run run2LDRM $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }} --runner echo | tail -1)
+          python3 -m pytest test/regression -v --exe "$exe"
