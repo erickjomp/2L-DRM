@@ -41,8 +41,14 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - name: Install fpm and pytest
-        run: python -m pip install fpm==0.10.1 pytest
+      # official fpm binaries; the PyPI fpm.exe fails to start on Windows (missing DLLs)
+      - uses: fortran-lang/setup-fpm@v10
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fpm-version: '0.10.1'
+
+      - name: Install pytest
+        run: python -m pip install pytest
 
       - name: Build
         run: fpm build $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }}
