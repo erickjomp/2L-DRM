@@ -7,18 +7,33 @@ on:
 
 jobs:
   regression:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} ${{ matrix.toolchain.compiler }} ${{ matrix.profile }}
+    runs-on: ${{ matrix.os }}
+    # Windows is not officially supported yet: run it, but do not fail the workflow
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         toolchain:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2025.0'}
         profile: [debug, release]
+        experimental: [false]
+        include:
+          - {os: windows-latest, toolchain: {compiler: gcc, version: 13}, profile: debug, experimental: true}
+          - {os: windows-latest, toolchain: {compiler: gcc, version: 13}, profile: release, experimental: true}
+    defaults:
+      run:
+        shell: bash
     env:
       FPM_OPTS: --profile ${{ matrix.profile }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
@@ -27,7 +42,7 @@ jobs:
           version: ${{ matrix.toolchain.version }}
 
       - name: Install fpm and pytest
-        run: pip install fpm==0.10.1 pytest
+        run: python -m pip install fpm==0.10.1 pytest
 
       - name: Build
         run: fpm build $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }}
@@ -35,4 +50,4 @@ jobs:
       - name: Regression test
         run: |
           exe=$(fpm run run2LDRM $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }} --runner echo | tail -1)
-          python3 -m pytest test/regression -v --exe "$exe"
+          python -m pytest test/regression -v --exe "$exe"

@@ -2,6 +2,9 @@
 build.sh
 install.sh
 install_release.sh
+test.sh
+test_builds.sh
+
 build*/
 __pycache__/
 .pytest_cache/
