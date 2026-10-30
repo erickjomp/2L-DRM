@@ -9,8 +9,8 @@ commit the new references.
 """
 import pytest
 
-from regression import (CASES, OUTPUTS, compare_csv, compare_grid,
-                        reference_path, save_reference)
+from regression import (CASES, HERE, OUTPUTS, compare_csv, compare_grid,
+                        reference_path, run_model, save_reference)
 
 THREADS = 4
 
@@ -36,3 +36,15 @@ def test_same_results_any_thread_count(run_case, case):
     serial, parallel = run_case(case, 1), run_case(case, THREADS)
     differing = [f for f in OUTPUTS if (serial / f).read_bytes() != (parallel / f).read_bytes()]
     assert not differing, f"outputs differ between 1 and {THREADS} threads: {differing}"
+
+
+def test_toml_config_same_as_flags(exe, inputs, run_case):
+    """The example configuration file (example/amz2_coarse.toml) must give the same
+    outputs as the solver3_iterative case given with flags."""
+    config = HERE.parent.parent / "example" / "amz2_coarse.toml"
+    from_file, error = run_model(exe, inputs, "solver3_iterative_toml", [], THREADS,
+                                 common_args=["--config", str(config)])
+    assert error is None, error
+    from_flags = run_case("solver3_iterative", THREADS)
+    differing = [f for f in OUTPUTS if (from_file / f).read_bytes() != (from_flags / f).read_bytes()]
+    assert not differing, f"outputs differ between --config and flags: {differing}"

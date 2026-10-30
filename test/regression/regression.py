@@ -10,7 +10,7 @@ from array import array
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CASE_DIR = HERE / "amz2_coarse"
+CASE_DIR = HERE / "data"
 REF_DIR = HERE / "reference"
 
 # Coarse grid written by make_coarse_case.py
@@ -62,11 +62,11 @@ def prepare_inputs(workdir):
         (workdir / f"{var}.txt").write_text("".join(f"{f.name}\n" for f in files))
 
 
-def run_model(exe, workdir, outname, extra_args, threads):
+def run_model(exe, workdir, outname, extra_args, threads, common_args=COMMON_ARGS):
     """Run run2LDRM in workdir, writing to workdir/outname. Returns (outdir, error)."""
     outdir = workdir / outname
     outdir.mkdir()
-    cmd = [str(exe), "-po", outname] + COMMON_ARGS + extra_args
+    cmd = [str(exe), "-po", outname] + common_args + extra_args
     env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     result = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True, text=True)
     (outdir / "stdout.txt").write_text(result.stdout + result.stderr)

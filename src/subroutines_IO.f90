@@ -8,9 +8,11 @@ contains
         use global_data
         use FLAP
         use datetime_module
+        use toml_config, only : config_argument, toml_to_ini, temporary_ini_name, delete_file
 
         type(command_line_interface)                 :: cli    ! Command Line Interface (CLI).
         integer                                      :: error_cli
+        character(len=:), allocatable                :: config_file, ini_file
         character(len=19)                            :: datetime0_str, datetime1_str, datetime2_str
         type(datetime)                               :: datetime2
         type(timedelta)                              :: td
@@ -473,8 +475,32 @@ contains
                 act='store',       &
                 def='1',           &
                 error=error_cli)
-        if (error_cli/=0) stop   
+        if (error_cli/=0) stop
 
+        call cli%add(switch='--config', &
+                switch_ab='-c',    &
+                help='Configuration file (TOML format) with values for the other options, using their long names as keys &
+                      &(e.g. nx = 1055). Options passed in the command line override the file.', &
+                required=.false.,   &
+                act='store',       &
+                def='',           &
+                error=error_cli)
+        if (error_cli/=0) stop
+
+        ! the configuration file (TOML) reaches FLAP as a temporary INI file, below the command line
+        config_file = config_argument()
+        if (len(config_file) > 0) then
+            ini_file = temporary_ini_name()
+            call toml_to_ini(config_file, ini_file)
+            call cli%set_config(file=ini_file, required=.true.)
+        end if
+        call cli%parse(error=error_cli)
+        if (len(config_file) > 0) then
+            call delete_file(ini_file)
+            if (error_cli/=0) write(*,'(A)') "Note: the configuration file above is a temporary copy of '" // &
+                                              config_file // "'; check the key named in the error there."
+        end if
+        if (error_cli/=0) stop
 
 
         call cli%get(switch='-pi', val=path_input, error=error_cli)

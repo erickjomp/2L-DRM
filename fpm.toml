@@ -19,7 +19,8 @@ source-form = "free"
 [preprocess.cpp]
 macros = ["_OPENMP"]
 [dependencies]
-FLAP = { git="https://github.com/szaghi/FLAP.git" }
+FLAP = { git="https://github.com/szaghi/FLAP.git", rev="19cad029681176ce9ae35296e99c5cf42da0212e" }  # needs set_config (INI files)
+toml-f = { git="https://github.com/toml-f/toml-f.git", tag="v0.5.2" }
 datetime = { git="https://github.com/wavebitscientific/datetime-fortran.git" }
 csv-fortran = { git="https://github.com/jacobwilliams/csv-fortran.git" }
 openmp = "*"

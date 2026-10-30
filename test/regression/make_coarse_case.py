@@ -2,7 +2,7 @@
 
 The original inputs (1055 x 863 cells, 3-hourly, ~120 GB) are coarsened by
 averaging BLOCK x BLOCK cells and cut to the first few days of May 2018.
-The result is written gzipped to ``amz2_coarse/`` and committed to the repo.
+The result is written gzipped to ``data/`` and committed to the repo.
 
 Only needed to regenerate the case (requires access to GLADE and numpy):
 
@@ -66,7 +66,7 @@ def main():
     global SRC
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--src", type=Path, default=SRC)
-    parser.add_argument("--out", type=Path, default=Path(__file__).parent / "amz2_coarse")
+    parser.add_argument("--out", type=Path, default=Path(__file__).parent / "data")
     args = parser.parse_args()
     SRC = args.src
     args.out.mkdir(parents=True, exist_ok=True)

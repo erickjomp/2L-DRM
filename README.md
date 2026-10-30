@@ -45,9 +45,77 @@ In addition, if using a Linux system, you may want to add `~/.local/bin/` to you
 
     export PATH=~/.local/bin/:$PATH
 
-Then you will be able to call the program `run2LDRM` from any directory. For a list of the required and optional inputs of this program, please use:
+Then you will be able to call the program `run2LDRM` from any directory.
+
+
+## Running 2L-DRM
+
+The inputs of `run2LDRM` (input files, grid, dates, tracing options, outputs, ...) can be given in a configuration file or as command-line arguments. **Using a configuration file is the preferred way**: it keeps all the settings of a run in one place, where they can be commented, reused and kept together with the results.
+
+The full explanation of how to run the program and of all its options (a description of each one, whether it is required or optional, and its default value) is given by:
 
     run2LDRM --help
+
+The next sections summarize the main ways to use them.
+
+### Example
+
+The repository includes a small example that runs in a few seconds: a coarsened version (32 x 26 cells, 7 days) of a 4 km simulation over the Amazon.
+
+**1. Prepare the example (only needed for this example).** From the repository folder, load the input files and the configuration file of the example into a new folder (here `my_example`):
+
+    python example/prepare_example.py my_example
+    cd my_example
+
+**2. Run 2L-DRM.** Now everything is ready to run the model. This is the only step needed in your own cases, once your input files and configuration file are prepared:
+
+    run2LDRM --config amz2_coarse.toml
+
+The results are written to `my_example/output/`. The configuration file of the example, `example/amz2_coarse.toml`, is a good starting point for your own runs.
+
+### Configuration file
+
+The configuration file is a text file that follows the [TOML](https://toml.io) format, and is passed with `--config` (or `-c`):
+
+    run2LDRM --config my_run.toml
+
+Each line sets one input as `name = value`, where the name is the long name shown by `run2LDRM --help`, without the leading `--`. Lines starting with `#` are comments. The `[sections]` are optional and only help to organize the file: their names are free and do not change how the inputs are read. Text values go between quotes, and dates can be written as `2018-06-01T00:00:00` or as text in the command-line format (`"2018-06-01_00:00:00"`). For example:
+
+```toml
+[input]
+pathin = "/path/to/inputs/"
+fileET = "ET.dat"
+# ...
+
+[grid]
+nx = 1055
+ny = 863
+dx = 4000.0
+dy = 4000.0
+
+[time]
+datetime0 = 2018-05-01T00:00:00
+datetime_start = 2018-06-01T00:00:00
+datetime_end = 2018-09-30T21:00:00
+data_dt = 3
+
+[tracing]
+tracing_dt = 900
+max_traxing = 720
+solver = 3
+```
+
+A complete configuration file is the one of the example above (`example/amz2_coarse.toml`).
+
+### Command-line arguments
+
+Inputs can also be passed as command-line arguments, using their long name (e.g. `--nx 1055`) or their short name (e.g. `-nx 1055`). They can be used on their own:
+
+    run2LDRM -pi /path/to/inputs/ -ET ET.dat -nx 1055 -ny 863 ...
+
+or together with a configuration file, in which case the command-line arguments override the values in the file. This is useful to reuse one configuration file for several runs, e.g. changing only the output directory:
+
+    run2LDRM --config my_run.toml -po other_output/
 
 
 ## Preparing input data
@@ -68,4 +136,4 @@ This tests the default build (`gfortran` compiler, `debug` profile). To test ano
     fpm build --compiler ifx --profile release
     python3 -m pytest test/regression --exe $(fpm run run2LDRM --compiler ifx --profile release --runner echo | tail -1)
 
-A failure means the results changed, not necessarily that they are wrong. If a change in results is intended, regenerate the references with `--update-reference` and commit them. The tests also run automatically on GitHub Actions with gfortran and ifx, in both debug and release, for every push and pull request. See `test/regression/make_coarse_case.py` for how the test case was built.
+A failure means the results changed, not necessarily that they are wrong. If a change in results is intended, regenerate the references with `--update-reference` and commit them. The tests also run automatically on GitHub Actions with gfortran and ifx, in both debug and release, for every push and pull request.

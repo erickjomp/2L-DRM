@@ -1,0 +1,47 @@
+# Configuration file of the example case (a small, coarsened run over the Amazon).
+# Keys are the long option names of `run2LDRM --help`; [sections] only group them.
+# Prepare the example with example/prepare_example.py, then run:
+#     run2LDRM --config amz2_coarse.toml
+#
+# The regression tests check that this file gives the same results as the
+# solver3_iterative case (test/regression/regression.py): if you change it,
+# keep both in sync.
+
+[input]
+listsfiles = true
+fileET = "ET.txt"
+filePP = "PP.txt"
+filePW = "PW.txt"
+fileU = "U.txt"
+fileV = "V.txt"
+filePWflux = "PWflux.txt"
+regions = "regions.dat"
+nregions = 2
+topomask = "mask_topo.dat"
+itarget = "target_i.dat"
+jtarget = "target_j.dat"
+domsize = 389
+
+[grid]
+nx = 32
+ny = 26
+dx = 128000.0
+dy = 128000.0
+
+[time]
+datetime0 = 2018-05-01T00:00:00
+datetime_start = 2018-05-04T00:00:00   # first step with 3 days of history (= max_traxing * tracing_dt)
+datetime_end = 2018-05-07T21:00:00
+data_dt = 3
+UV_dt = 3
+
+[tracing]
+tracing_dt = 900
+max_traxing = 288
+nextpoint = 1
+solver = 3
+
+[output]
+pathout = "output/"   # must exist; the regression test overrides it with -po
+verbose = true
+writerhogrid = true
