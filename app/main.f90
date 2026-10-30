@@ -4,6 +4,7 @@ program recycling
     USE subroutines_IO
     USE subroutines_tracing
     USE subroutines_process
+    USE stdlib_datetime, only: datetime_type, timedelta, operator(+)
 #ifdef _OPENMP
     USE omp_lib
 #endif
@@ -37,7 +38,7 @@ program recycling
     integer                                           :: i_UVdt
     ! type(timedelta)                                   :: timedelta_c
     ! type(datetime)                                    :: datetime0
-    type(datetime)                                    :: datetime_c
+    type(datetime_type)                               :: datetime_c
     ! REMOVE
     integer       :: ii,jj,i_celldomain,i_region, i_section, i_point
     logical       :: found, verbose2
@@ -98,7 +99,7 @@ program recycling
 
         datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
         ! print stdout,"------ ", datetime_c%isoformat(' '), "    | time step = ",t_data, " ------"
-        write (*,*) "------ ", datetime_c%isoformat(' '), "    | time step = ",t_data, " ------"
+        write (*,*) "------ ", datetime_iso(datetime_c, ' ', millisecond=.true.), "    | time step = ",t_data, " ------"
         ! print *, "----"
 
         call get_PP_domain(t_data, PP_domain)

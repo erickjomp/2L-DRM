@@ -20,7 +20,8 @@ source-form = "free"
 macros = ["_OPENMP"]
 [dependencies]
 FLAP = { git="https://github.com/szaghi/FLAP.git" }
-datetime = { git="https://github.com/wavebitscientific/datetime-fortran.git" }
+# stdlib-fpm branch of fortran-lang/stdlib (only stdlib_datetime is used)
+stdlib = { git="https://github.com/fortran-lang/stdlib", rev="58eb9133966c2797e0593281169ef57c43eccc1d" }
 csv-fortran = { git="https://github.com/jacobwilliams/csv-fortran.git" }
 openmp = "*"
 

@@ -7,13 +7,13 @@ contains
     subroutine read_global_data()
         use global_data
         use FLAP
-        use datetime_module
+        use stdlib_datetime, only: datetime_type, timedelta_type, operator(-), total_seconds
 
         type(command_line_interface)                 :: cli    ! Command Line Interface (CLI).
         integer                                      :: error_cli
         character(len=19)                            :: datetime0_str, datetime1_str, datetime2_str
-        type(datetime)                               :: datetime2
-        type(timedelta)                              :: td
+        type(datetime_type)                          :: datetime2
+        type(timedelta_type)                         :: td
         logical                                      :: is_passed
         ! bigx=1471 !253 ! 1471 !1471  !number of grids in x and y direction
         ! bigy=2027 !346 ! 2027 ! 2027
@@ -595,7 +595,7 @@ contains
         if (error_cli/=0) stop
         datetime1 = parse_datetime(datetime1_str)
         td = datetime1 - datetime0
-        t_data_start = 1 + td%total_seconds() / (data_dt*60*60)
+        t_data_start = 1 + total_seconds(td) / (data_dt*60*60)
         ! print *, "#############    t1 = ",t_data_start, "##############"
 
         ! call cli%get(switch='-t2', val=t_data_end, error=error_cli)
@@ -605,7 +605,7 @@ contains
         if (error_cli/=0) stop
         datetime2 = parse_datetime(datetime2_str)
         td = datetime2 - datetime0
-        t_data_end = 1 + td%total_seconds() / (data_dt*60*60)
+        t_data_end = 1 + total_seconds(td) / (data_dt*60*60)
         ! is_passed = cli%is_passed(switch='-d2')
         ! if (is_passed) then
         !     call cli%get(switch='-d2', val=datetime2_str, error=error_cli)
@@ -750,9 +750,9 @@ contains
     ! parses "YYYY-MM-DD_hh:mm:ss". Replaces datetime's strptime, whose C++
     ! implementation aborts on Windows (invalid locale name)
     function parse_datetime(str) result(dt)
-        use datetime_module, only: datetime
+        use stdlib_datetime, only: datetime_type, datetime
         character(len=*), intent(in) :: str
-        type(datetime)               :: dt
+        type(datetime_type)          :: dt
         character(len=len(str))      :: buffer
         integer                      :: year, month, day, hour, minute, second, ios, i
 
@@ -766,6 +766,24 @@ contains
             error stop
         end if
         dt = datetime(year, month, day, hour, minute, second)
+    end function
+
+    ! formats dt as "YYYY-MM-DD<sep>hh:mm:ss", plus ".sss" if millisecond. Replaces datetime's
+    ! strftime/isoformat; stdlib's format_datetime appends a timezone suffix ("Z")
+    function datetime_iso(dt, sep, millisecond) result(str)
+        use stdlib_datetime, only: datetime_type
+        type(datetime_type), intent(in) :: dt
+        character(len=1), intent(in)    :: sep
+        logical, intent(in), optional   :: millisecond
+        character(len=:), allocatable   :: str
+        character(len=23)               :: buffer
+
+        write(buffer, '(i4.4,"-",i2.2,"-",i2.2,a1,i2.2,":",i2.2,":",i2.2,".",i3.3)') &
+            dt%year, dt%month, dt%day, sep, dt%hour, dt%minute, dt%second, dt%millisecond
+        str = buffer(1:19)
+        if (present(millisecond)) then
+            if (millisecond) str = buffer
+        end if
     end function
 
     subroutine read_list_files(text_file, files, rem_file)
@@ -1233,7 +1251,7 @@ contains
         use global_data, only: t_data_start,t_data_end, nregions, file_rhocolumn_domain_daily, &
                                data_dt, datetime0
         use csv_module
-        use datetime_module
+        use stdlib_datetime, only: datetime_type, timedelta, operator(+)
         ! use 
 
         real(4), dimension(:,:), intent(in)              :: rhocolumn_domain
@@ -1242,7 +1260,7 @@ contains
         ! character(10), dimension(nregions)               :: name_regions
         type(csv_file) :: f
         logical :: status_ok
-        type(datetime)                                   :: datetime_c
+        type(datetime_type)                              :: datetime_c
 
         do i_region = 1, nregions
             id_regions(i_region) = i_region
@@ -1267,7 +1285,7 @@ contains
         ! add some data:
         do t_data = t_data_start, t_data_end
             datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
-            call f%add(datetime_c%strftime("%Y-%m-%dT%H:%M:%S"))
+            call f%add(datetime_iso(datetime_c, "T"))
             i_t_data = t_data - t_data_start + 1 
             do i_region = 1, nregions
                 call f%add(rhocolumn_domain(i_region, i_t_data),real_fmt='(F7.5)')
@@ -1342,13 +1360,13 @@ contains
     subroutine  write_precipareal_daily(PP_areal_days)
         use global_data, only: t_data_end, t_data_start, file_precipareal_domain_daily, data_dt, datetime0
         use csv_module
-        use datetime_module
+        use stdlib_datetime, only: datetime_type, timedelta, operator(+)
         
         real(4), dimension(t_data_end-t_data_start+1)    :: PP_areal_days
         integer                                          :: t_data, i_t_data
         type(csv_file)                                   :: f
         logical                                          :: status_ok
-        type(datetime)                                   :: datetime_c
+        type(datetime_type)                              :: datetime_c
 
         ! set optional inputs:
         call f%initialize(verbose = .true., enclose_strings_in_quotes = .false.)
@@ -1362,7 +1380,7 @@ contains
 
         do t_data = t_data_start, t_data_end
             datetime_c = datetime0 + timedelta(hours = data_dt * (t_data - 1))
-            call f%add(datetime_c%strftime("%Y-%m-%dT%H:%M:%S"))
+            call f%add(datetime_iso(datetime_c, "T"))
             i_t_data = t_data - t_data_start + 1 
             call f%add(PP_areal_days(i_t_data),real_fmt='(F9.5)')
             call f%next_row()
@@ -1382,7 +1400,7 @@ contains
     subroutine write_path(path_xy, length_path, islab, t_data, k, step,datetime0, id_thread, n_threads)
         use global_data, only:   t_data_start, t_data_end, file_paths_xy, domain_ij, delta_write_paths, &
                                  ij0_write_paths, tracing_dt
-        use datetime_module
+        use stdlib_datetime, only: datetime_type, timedelta, operator(-)
         use csv_module
         real(4), dimension(:,:)  :: path_xy
         integer, intent(in)      :: islab, t_data, length_path, k, step
@@ -1390,7 +1408,7 @@ contains
         logical                  :: status_ok
         logical, save            :: first_time = .true.
         !$omp threadprivate(first_time)
-        type(datetime)           :: datetime0, datetime_tr
+        type(datetime_type)      :: datetime0, datetime_tr
         type(csv_file),save      :: fpaths
         !$omp threadprivate(fpaths)
         integer, intent(in), optional :: id_thread, n_threads
@@ -1459,7 +1477,7 @@ contains
                 !                 iday, datetime_tr%strftime("%Y-%m-%dT%H:%M:%S"), islab, i_point, k, path_xy(1, i_point), path_xy(2, i_point)
                 call fpaths%add(t_data)  
                 datetime_tr = datetime0 - timedelta(seconds = tracing_dt * (i_point - 1))
-                call fpaths%add(datetime_tr%strftime("%Y-%m-%dT%H:%M:%S"))
+                call fpaths%add(datetime_iso(datetime_tr, "T"))
                 call fpaths%add([islab,i_point,k])
                 call fpaths%add([path_xy(1, i_point), path_xy(2, i_point)])
                 call fpaths%next_row()
@@ -1484,7 +1502,7 @@ contains
 
         use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
         use, intrinsic :: iso_fortran_env, only: real32
-        use datetime_module
+        use stdlib_datetime, only: datetime_type, timedelta, operator(+), days_in_month
         implicit none
         ! real(real32) :: nan
         real(4)                                           :: nan        
@@ -1492,8 +1510,8 @@ contains
         integer(4), save                                  :: count, i, j, i_reg, k
         real(4), dimension(nregions,domsize),intent(in)   :: rhocolumn
         real(4), dimension(bigx, bigy, nregions)          :: rhocolumn_grid
-        type(datetime), intent(in)                        :: datetime_c
-        type(datetime)                                    :: datetime2
+        type(datetime_type), intent(in)                   :: datetime_c
+        type(datetime_type)                               :: datetime2
         integer, save                                     :: ndays_month, year, month
         integer,save                                      :: old_month = 0
 
@@ -1501,18 +1519,18 @@ contains
         ! old_month = 0
         if (write_rho_grid_option == 2) then
             
-            month = datetime_c%getMonth()
+            month = datetime_c%month
             
             if (old_month .ne. month) then
-                year = datetime_c%getYear()
-                ndays_month = daysInMonth(month, year)
+                year = datetime_c%year
+                ndays_month = days_in_month(month, year)
                 datetime2 = datetime_c + timedelta(hours = ndays_month * 24  - data_dt)
 
                 first_time = .true.
                 
                 filename_rhocolumn_grid = trim(filename_rhocolumn_grid_base) // "_" // &
-                                         datetime_c%strftime("%Y-%m-%dT%H:%M:%S") // "_TO_" // &
-                                         datetime2%strftime("%Y-%m-%dT%H:%M:%S") // ".dat"
+                                         datetime_iso(datetime_c, "T") // "_TO_" // &
+                                         datetime_iso(datetime2, "T") // ".dat"
                 filename_rhocolumn_grid = trim(prefix_outfiles) // filename_rhocolumn_grid
                 file_rhocolumn_grid = trim(path_output) // "/" // filename_rhocolumn_grid
             end if
