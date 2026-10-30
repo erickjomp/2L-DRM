@@ -586,14 +586,14 @@ contains
 
         call cli%get(switch='-d0', val=datetime0_str, error=error_cli)
         if (error_cli/=0) stop
-        datetime0 = strptime(datetime0_str,"%Y-%m-%d_%H:%M:%S")
+        datetime0 = parse_datetime(datetime0_str)
         ! print *, datetime0 % isoformat()
 
         ! call cli%get(switch='-t1', val=t_data_start, error=error_cli)
         ! if (error_cli/=0) stop
         call cli%get(switch='-d1', val=datetime1_str, error=error_cli)
         if (error_cli/=0) stop
-        datetime1 = strptime(datetime1_str,"%Y-%m-%d_%H:%M:%S")
+        datetime1 = parse_datetime(datetime1_str)
         td = datetime1 - datetime0
         t_data_start = 1 + td%total_seconds() / (data_dt*60*60)
         ! print *, "#############    t1 = ",t_data_start, "##############"
@@ -603,14 +603,14 @@ contains
         ! if (t_data_end == 0)  t_data_end = n_datadt
         call cli%get(switch='-d2', val=datetime2_str, error=error_cli)
         if (error_cli/=0) stop
-        datetime2 = strptime(datetime2_str,"%Y-%m-%d_%H:%M:%S")
+        datetime2 = parse_datetime(datetime2_str)
         td = datetime2 - datetime0
         t_data_end = 1 + td%total_seconds() / (data_dt*60*60)
         ! is_passed = cli%is_passed(switch='-d2')
         ! if (is_passed) then
         !     call cli%get(switch='-d2', val=datetime2_str, error=error_cli)
         !     if (error_cli/=0) stop
-        !     datetime2 = strptime(datetime2_str,"%Y-%m-%d_%H:%M:%S")
+        !     datetime2 = parse_datetime(datetime2_str)
         !     td = datetime2 - datetime0
         !     t_data_end = 1 + td%total_seconds() / (data_dt*60*60)
         !     ! if (t_data_end == 0)  t_data_end = n_datadt
@@ -747,7 +747,28 @@ contains
 
     end subroutine
 
-    subroutine read_list_files(text_file, files, rem_file) 
+    ! parses "YYYY-MM-DD_hh:mm:ss". Replaces datetime's strptime, whose C++
+    ! implementation aborts on Windows (invalid locale name)
+    function parse_datetime(str) result(dt)
+        use datetime_module, only: datetime
+        character(len=*), intent(in) :: str
+        type(datetime)               :: dt
+        character(len=len(str))      :: buffer
+        integer                      :: year, month, day, hour, minute, second, ios, i
+
+        buffer = str
+        do i = 1, len(buffer)
+            if (index("-_:", buffer(i:i)) > 0) buffer(i:i) = " "
+        end do
+        read(buffer, *, iostat=ios) year, month, day, hour, minute, second
+        if (ios /= 0) then
+            write(*,*) "Invalid datetime '", trim(str), "'. Expected format: YYYY-MM-DD_hh:mm:ss"
+            error stop
+        end if
+        dt = datetime(year, month, day, hour, minute, second)
+    end function
+
+    subroutine read_list_files(text_file, files, rem_file)
         ! https://fortran-lang.discourse.group/t/allocation-of-array-for-reading-strings-from-a-text-file/5986/4
         ! type :: vlstring_t
         ! character(len=:), allocatable :: string
