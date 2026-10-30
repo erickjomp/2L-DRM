@@ -164,7 +164,7 @@ program recycling
             call calculate_areal_rho(rho(:,:,islab), PP_domain, domsize, nregions,&
                                         rho_domain(:,islab,t_data-t_data_start+1))  ! outputs
             ! if (verbose)  print * ,"slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
-            if (verbose)  write(*,'(A, I1, A, *(XX,F4.3))')  "slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
+            if (verbose)  write(*,'(A, I1, A, *(2X,F4.3))')  "slab ",islab, " : ", rho_domain(:,islab, t_data-t_data_start+1)
 
         end do
 
@@ -189,7 +189,7 @@ program recycling
         ! if (verbose)  print *, "column    ", "   "," : ", rhocolumn_domain(:, t_data-t_data_start+1)
         
         ! if (verbose)  write(*,'(A, A, *(XX,"0",F4.3))')  "column ", " : ", rhocolumn_domain(:, t_data-t_data_start+1)
-        if (verbose)  write(*,'(A, A, *(XX,F4.3))')  "column", " : ", rhocolumn_domain(:, t_data-t_data_start+1)
+        if (verbose)  write(*,'(A, A, *(2X,F4.3))')  "column", " : ", rhocolumn_domain(:, t_data-t_data_start+1)
 
         PP_areal_days(t_data-t_data_start+1) = sum(PP_domain) /size(PP_domain)    
                   
@@ -205,7 +205,7 @@ program recycling
 
     ! print stdout,"rho - time averaged :"
     write (*,*)   "rho - time averaged :"
-    if (verbose)   write(*,"(*(XX,F4.3))") rho_timeavg
+    if (verbose)   write(*,"(*(2X,F4.3))") rho_timeavg
     call write_rhodomain_timeavg(rho_timeavg)
 
     call write_precipareal_daily(PP_areal_days)
