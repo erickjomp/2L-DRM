@@ -19,7 +19,7 @@ source-form = "free"
 [preprocess.cpp]
 macros = ["_OPENMP"]
 [dependencies]
-FLAP = { git="https://github.com/szaghi/FLAP.git", rev="19cad029681176ce9ae35296e99c5cf42da0212e" }  # needs set_config (INI files)
+FLAP = { git="https://github.com/szaghi/FLAP.git", tag="v2.5.3" }  # set_config (INI files) needs >= v2.0.0
 toml-f = { git="https://github.com/toml-f/toml-f.git", tag="v0.5.2" }
 # stdlib-fpm branch of fortran-lang/stdlib (only stdlib_datetime is used)
 stdlib = { git="https://github.com/fortran-lang/stdlib", rev="58eb9133966c2797e0593281169ef57c43eccc1d" }

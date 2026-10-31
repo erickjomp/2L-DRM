@@ -8,3 +8,4 @@ test_builds.sh
 build*/
 __pycache__/
 .pytest_cache/
+.claude/
