@@ -22,6 +22,11 @@ itarget = "target_i.dat"
 jtarget = "target_j.dat"
 domsize = 389
 
+[output]
+pathout = "output/"   
+verbose = true
+writerhogrid = true
+
 [grid]
 nx = 32
 ny = 26
@@ -41,7 +46,3 @@ max_traxing = 288
 nextpoint = 1
 solver = 3
 
-[output]
-pathout = "output/"   # must exist; the regression test overrides it with -po
-verbose = true
-writerhogrid = true
