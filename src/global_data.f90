@@ -10,7 +10,7 @@ MODULE global_data
     ! nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
     ! https://www.reddit.com/r/fortran/comments/bu41uz/how_to_assign_nan_to_a_variable_or_array_with/
     
-    use datetime_module
+    use stdlib_datetime, only: datetime_type
 
     implicit none
     
@@ -27,7 +27,7 @@ MODULE global_data
     !__________________________starting dates and ending dates,core region
     integer, save :: t_data_start, t_data_end!= 123+15 !196  !123+15  !day1=16, day2=   !date starts and ends simulation
     ! character(len=19), save    :: datetime0_str
-    type(datetime),save :: datetime0, datetime1
+    type(datetime_type),save :: datetime0, datetime1
     integer, save :: domsize!=49509  !1386 nonCPM  !49509 CPM !49509  !number of grids within the monsoon region
     integer, save :: nregions != 8  ! 83148 cells landocean CPM  ! 31774 cells land CPM ! 8    !number of regions in map file    ! CHANGE 
     !______________________________________________________________________
