@@ -74,7 +74,7 @@ MODULE global_data
     logical, save               :: listsfiles != .false.
     ! character(len=150), save    :: path_input = '/data/keeling/a/erickkc2/f/SAAG2/input_files_2LDRM-nonCPM_byyears__24km/'
     character(len=len_path), save     :: filename_regions != "WRF_regions1.dat"  !'WRF_regionscells.dat'  !"WRF_basins.dat" "WRF_regionscells_landocean.dat" 
-    character(len=len_path), save     :: filename_topomask != 'mask_topo.dat'
+    character(len=len_path), save     :: filename_topomask
     character(len=len_path), save     :: filename_PP != '2018_months05to08_PP24.dat'   ! 2018_months05to08_PP24.dat
     character(len=len_path), save     :: filename_ET != '2018_months05to08_ET24.dat'
     character(len=len_path), save     :: filename_PW != '2018_months05to08_PW24.dat'
@@ -111,8 +111,8 @@ MODULE global_data
     !---------------------- GLOBAL DATA --------------------
     !=======================================================
 
-    character(len=len_path), save         :: file_regions, &! = trim(path_input) // filename_regions, & !  , file_topomask ! &
-                                        file_topomask, &!= trim(path_input) // filename_topomask, &
+    character(len=len_path), save         :: file_regions, &! = trim(path_input) // filename_regions, &
+                                        file_topomask, &  ! empty: no topography mask
                                         file_domain_i, &!= = trim(path_input) // filename_domain_i, &
                                         file_domain_j  ! = trim(path_input) // filename_domain_j
 
@@ -134,7 +134,7 @@ MODULE global_data
 
 
 
-    integer, dimension(:,:,:),save, allocatable        :: MASK_TOPO
+    integer, dimension(:,:),save, allocatable          :: MASK_TOPO    ! 0: surface above the interslab (1-layer)
     integer, dimension(:,:),save, allocatable          :: MAP_REGIONS  
     real(4), dimension(:,:,:),save, allocatable        :: PP, ET
     real(4), dimension(:,:,:,:), save, allocatable     :: PW
@@ -151,7 +151,6 @@ MODULE global_data
     ! integer, dimension(:,:,:,:),save, allocatable      :: temp_MASK_PW_FLUX 
 
     ! ################ OLD ##################!                     
-    ! integer, dimension(bigx,bigy,nslabs-1),save       :: MASK_TOPO
     ! integer, dimension(bigx,bigy),save                :: MAP_REGIONS  
     ! real(4), dimension(bigx,bigy,n_datadt),save          :: PP, ET
     ! real(4), dimension(bigx,bigy,nslabs,n_datadt), save  :: PW

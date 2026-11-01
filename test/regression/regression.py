@@ -20,7 +20,7 @@ COMMON_ARGS = [
     "-lf", ".true.",
     "-ET", "ET.txt", "-PP", "PP.txt", "-PW", "PW.txt",
     "-U", "U.txt", "-V", "V.txt", "-PWf", "PWflux.txt",
-    "-reg", "regions.dat", "-nreg", str(NREGIONS), "-mask", "mask_topo.dat",
+    "-reg", "regions.dat", "-nreg", str(NREGIONS),
     "-it", "target_i.dat", "-jt", "target_j.dat", "-ds", str(DOMSIZE),
     "-nx", str(NX), "-ny", str(NY), "-dx", str(DX), "-dy", str(DX),
     "-d0", "2018-05-01_00:00:00",

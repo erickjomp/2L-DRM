@@ -628,25 +628,16 @@ contains
         ET_value = ET(i, j, i_datadt) / (data_dt / UV_dt)   ! MODIFIED 2025
         PW_FLUX_value = PW_FLUX(i, j, 1 , i_datadt)      !!!! MODIFY
 
-        ! ! should be better if by default it is required to have mask with the same number of slabs as the other variables
-        ! if (islab < nslabs) then
-        !     mask1 =  MASK_TOPO[out_i, out_j, islab] .ne. 0
-        !     mask2 = MASK_PW_FLUX[out_i, out_j, islab, iday] .ne. 0 
-        ! else  
-        !     mask1 = .true.
-        !     mask2 = .true.
-        ! end if
-
         PWsum = sum(PW_values, mask = .NOT.(isnan(PW_values)))
           
 
         !!!! UPDATE !!!!
-        mask1 = MASK_TOPO(i, j, 1) 
+        mask1 = MASK_TOPO(i, j)
         mask2= MASK_PW_FLUX(i, j, 1, i_datadt)
         
         ! PW_flux * (PWsum)/(PW1 * PW2)  (FLUX ratio)
         E_PW_ratio = ET_value / PWsum 
-        if ((mask1 == 0) .or. (mask2== 0)) then ! 1 layer
+        if ((mask1 == 0) .or. (mask2 == 0)) then ! 1 layer (topography or PWflux is NaN)
             FLUX_UP = ET_value
             FLUX_ratio = FLUX_UP / PWsum      
             flag = 0    ! only 1-Layer
@@ -686,11 +677,11 @@ contains
         PWsum = sum(PW_values, mask = .NOT.(isnan(PW_values)))
           
         !!!! UPDATE !!!!
-        mask1 = MASK_TOPO(i, j, 1) 
+        mask1 = MASK_TOPO(i, j)
         mask2= MASK_PW_FLUX(i, j, 1, i_datadt)
         
         E_PW_ratio = ET_value / PWsum 
-        if ((mask1 == 0) .or. (mask2 == 0)) then  ! 1 layer
+        if ((mask1 == 0) .or. (mask2 == 0)) then  ! 1 layer (topography or PWflux is NaN)
             E_PW1_ratio = NAN_value
             FLUX_ratio  = NAN_value
             flag = 0

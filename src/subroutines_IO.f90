@@ -149,11 +149,13 @@ contains
 
         call cli%add(switch='--topomask', &
                     switch_ab='-mask',    &
-                    help='Binary file containing the topography mask for interslabs. The dimennsions must be (nx, ny). &
-                    &The value is 1.0 for grid cells where the surface is below the interslab pressure level and 0.0 otherwise. &
-                    &This is useful for mountainous regions. If the topography is flat, all the values will be 1.0. ',   &
-                    required=.true.,   &
+                    help='Binary file containing the topography mask for the interslab. Optional. &
+                    &The dimensions must be (nx, ny). The value is 1.0 for grid cells where the surface &
+                    &is below the interslab pressure level and 0.0 otherwise (cells with 0.0 are treated &
+                    &as 1-layer). If not given, only cells where PWflux is NaN are treated as 1-layer.',   &
+                    required=.false.,   &
                     act='store',       &
+                    def='',            &
                     error=error_cli)
         if (error_cli/=0) stop
 
@@ -572,7 +574,11 @@ contains
         
         call cli%get(switch='-mask', val=filename_topomask, error=error_cli)
         if (error_cli/=0) stop
-        file_topomask = trim(path_input) // filename_topomask
+        if (len_trim(filename_topomask) > 0) then
+            file_topomask = trim(path_input) // filename_topomask
+        else
+            file_topomask = ''
+        end if
 
         call cli%get(switch='-it', val=filename_domain_i, error=error_cli)
         if (error_cli/=0) stop
@@ -706,7 +712,7 @@ contains
         ! calculte number of dt (dt of velocities)
 
 
-        allocate(MASK_TOPO(bigx,bigy,nslabs-1))
+        allocate(MASK_TOPO(bigx, bigy))
         allocate(MAP_REGIONS(bigx, bigy))
         ! allocate(PP(bigx,bigy,n_datadt))
         ! allocate(ET(bigx,bigy,n_datadt))
@@ -753,8 +759,7 @@ contains
         !!!! ##########  end TEMPORAL ########## !!!!!
 
 
-        ! file_regions = trim(path_input) // filename_regions !  , file_topomask ! &
-        ! file_topomask = trim(path_input) // filename_topomask
+        ! file_regions = trim(path_input) // filename_regions
         ! file_domain_i = trim(path_input) // filename_domain_i
         ! file_domain_j = trim(path_input) // filename_domain_j
         filename_rhodomain_daily = trim(prefix_outfiles) // filename_rhodomain_daily
@@ -1012,16 +1017,25 @@ contains
         end do
     end subroutine
 
-    ! reads  MASK_TOPO, MAP_REGIONS
+    ! reads MASK_TOPO (optional) and MAP_REGIONS
     subroutine read_masks()
         use global_data, only : MASK_TOPO, MAP_REGIONS, bigx, bigy, file_regions, file_topomask
 
         real,dimension(bigx,bigy) :: regions2b
+        real(4),dimension(bigx,bigy) :: topo2b
 
-        open(113, file = file_topomask,status = "old", form = "unformatted", access = "stream")
-        read(113) MASK_TOPO
-        close(113)
-        write(*,*) 'Topography Mask has been loaded.'
+        if (len_trim(file_topomask) > 0) then
+            ! float32 file; only the first (nx, ny) layer is used. Any nonzero value counts as 1
+            ! (same result as the old raw integer read of the 0.0/1.0 float bits)
+            open(113, file = file_topomask,status = "old", form = "unformatted", access = "stream")
+            read(113) topo2b
+            close(113)
+            MASK_TOPO = merge(1, 0, topo2b /= 0.0)
+            write(*,*) 'Topography Mask has been loaded.'
+        else
+            MASK_TOPO = 1
+            write(*,*) 'No topography mask given: 1-layer cells are only those where PWflux is NaN.'
+        end if
 
         open(112,file=file_regions,status='old',form='unformatted',access='stream')
         read(112) regions2b

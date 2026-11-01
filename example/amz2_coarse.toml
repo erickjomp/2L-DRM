@@ -17,7 +17,6 @@ fileV = "V.txt"
 filePWflux = "PWflux.txt"
 regions = "regions.dat"
 nregions = 2
-topomask = "mask_topo.dat"
 itarget = "target_i.dat"
 jtarget = "target_j.dat"
 domsize = 389

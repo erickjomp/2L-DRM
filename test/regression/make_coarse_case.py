@@ -73,7 +73,6 @@ def main():
 
     regions = majority(read_static("WRF_amazon.dat"))
     write(args.out / "regions.dat.gz", regions)
-    write(args.out / "mask_topo.dat.gz", majority(read_static("mask_topo_2levels500.dat")))
 
     # Target region = coarse cells of region 1, as 1-based (i, j) indices.
     jj, ii = np.nonzero(regions == 1)

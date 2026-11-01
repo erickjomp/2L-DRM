@@ -49,3 +49,25 @@ def test_toml_config_same_as_flags(exe, inputs, run_case):
     from_flags = run_case("solver3_iterative", THREADS)
     differing = [f for f in OUTPUTS if (from_file / f).read_bytes() != (from_flags / f).read_bytes()]
     assert not differing, f"outputs differ between --config and flags: {differing}"
+
+
+def test_topomask_optional(exe, inputs, run_case):
+    """--topomask is optional: an all-ones mask must give the same outputs as no mask,
+    and zeros in the mask (1-layer cells) must change the results of solver 1."""
+    import struct
+    from regression import CASES, NX, NY, OUTPUTS
+
+    n = NX * NY
+    (inputs / "mask_ones.dat").write_bytes(struct.pack(f"<{n}f", *[1.0] * n))
+    (inputs / "mask_zeros.dat").write_bytes(struct.pack(f"<{n}f", *[float(k % 3 != 0) for k in range(n)]))
+
+    case = "solver1_direct"
+    no_mask = run_case(case, THREADS)
+    for mask, should_match in [("mask_ones.dat", True), ("mask_zeros.dat", False)]:
+        outdir, error = run_model(exe, inputs, f"{case}_{mask[:-4]}", CASES[case] + ["-mask", mask], THREADS)
+        assert error is None, error
+        differing = [f for f in OUTPUTS if (outdir / f).read_bytes() != (no_mask / f).read_bytes()]
+        if should_match:
+            assert not differing, f"all-ones mask differs from no mask: {differing}"
+        else:
+            assert differing, "a mask with zeros did not change the results"
