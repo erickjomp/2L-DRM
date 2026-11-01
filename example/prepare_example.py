@@ -27,7 +27,6 @@ def main():
     args.directory.mkdir(parents=True, exist_ok=True)
     prepare_inputs(args.directory)
     shutil.copy(HERE / CONFIG, args.directory / CONFIG)
-    (args.directory / "output").mkdir(exist_ok=True)  # run2LDRM does not create it
 
     print(f"Example ready in {args.directory}. Run it with:\n"
           f"    cd {args.directory}\n"

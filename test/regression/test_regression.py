@@ -40,9 +40,10 @@ def test_same_results_any_thread_count(run_case, case):
 
 def test_toml_config_same_as_flags(exe, inputs, run_case):
     """The example configuration file (example/amz2_coarse.toml) must give the same
-    outputs as the solver3_iterative case given with flags."""
+    outputs as the solver3_iterative case given with flags. Its output directory has
+    missing parents, which run2LDRM must create."""
     config = HERE.parent.parent / "example" / "amz2_coarse.toml"
-    from_file, error = run_model(exe, inputs, "solver3_iterative_toml", [], THREADS,
+    from_file, error = run_model(exe, inputs, "new_dir/solver3_iterative_toml", [], THREADS,
                                  common_args=["--config", str(config)])
     assert error is None, error
     from_flags = run_case("solver3_iterative", THREADS)

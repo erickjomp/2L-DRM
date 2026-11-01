@@ -9,10 +9,13 @@ contains
         use FLAP
         use stdlib_datetime, only: datetime_type, timedelta_type, operator(-), total_seconds
         use toml_config, only : config_argument, toml_to_ini, temporary_ini_name, delete_file
+        use stdlib_system, only: is_directory, make_directory_all
+        use stdlib_error, only: state_type
 
         type(command_line_interface)                 :: cli    ! Command Line Interface (CLI).
         integer                                      :: error_cli
         character(len=:), allocatable                :: config_file, ini_file
+        type(state_type)                             :: error_mkdir
         character(len=19)                            :: datetime0_str, datetime1_str, datetime2_str
         type(datetime_type)                          :: datetime2
         type(timedelta_type)                         :: td
@@ -174,7 +177,7 @@ contains
 
         call cli%add(switch='--pathout', &
                     switch_ab='-po',    &
-                    help='Path outputs.',   &
+                    help='Path outputs. Created (with its parent directories) if it does not exist.',   &
                     required=.true.,   &
                     act='store',       &
                     error=error_cli)
@@ -582,6 +585,15 @@ contains
 
         call cli%get(switch='-po', val=path_output, error=error_cli)
         if (error_cli/=0) stop
+        ! the output directory (and its parents) is created if it does not exist
+        if (.not. is_directory(trim(path_output))) then
+            call make_directory_all(trim(path_output), error_mkdir)
+            if (error_mkdir%error()) then
+                write(*,'(A)') "Cannot create output directory '" // trim(path_output) // "': " // &
+                               error_mkdir%print_msg()
+                error stop
+            end if
+        end if
 
         call cli%get(switch='-pre', val=prefix_outfiles, error=error_cli)
         if (error_cli/=0) stop
@@ -814,17 +826,18 @@ contains
 
     subroutine read_list_files(text_file, files, rem_file)
         ! https://fortran-lang.discourse.group/t/allocation-of-array-for-reading-strings-from-a-text-file/5986/4
+        use global_data, only: len_path
         ! type :: vlstring_t
         ! character(len=:), allocatable :: string
         ! end type
         integer :: iun, nrecs, istat
         character(len=*), intent(in)  :: text_file
-        character(len=200), intent(out), allocatable :: files(:)
+        character(len=len_path), intent(out), allocatable :: files(:)
         integer, intent(in)               :: rem_file
-        character(len=200) :: buffer
+        character(len=len_path) :: buffer
         character(len=1) :: dummy
         integer          :: i
-        character(len=200), allocatable :: files_temp(:)
+        character(len=len_path), allocatable :: files_temp(:)
 
         ! print * , text_file
         open(newunit=iun, file=text_file, form="formatted", status = "old")
@@ -839,7 +852,7 @@ contains
         allocate(files(nrecs))
         rewind(iun)
         read_loop: do i=1,nrecs
-            buffer=repeat(" ", 200)
+            buffer=repeat(" ", len_path)
             read(iun,'(a)', iostat=istat) buffer
             ! print *,buffer
             if (istat /= 0) then

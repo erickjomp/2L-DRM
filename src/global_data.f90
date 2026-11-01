@@ -63,26 +63,29 @@ MODULE global_data
     integer, save :: n_UVdt_tracing
 
 
+    ! length of every path and file name (the maximum path length in Linux)
+    integer, parameter :: len_path = 4096
+
     !=======================================================
     !---------------------- INPUT FILES --------------------
     !=======================================================
     ! this sections sets the name of the files 
-    character(len=150), save    :: path_input != '/data/keeling/a/erickkc2/f/SAAG3/01_inputs2LDRM/input_files_2LDRM_CPM-4km/'
+    character(len=len_path), save    :: path_input != '/data/keeling/a/erickkc2/f/SAAG3/01_inputs2LDRM/input_files_2LDRM_CPM-4km/'
     logical, save               :: listsfiles != .false.
     ! character(len=150), save    :: path_input = '/data/keeling/a/erickkc2/f/SAAG2/input_files_2LDRM-nonCPM_byyears__24km/'
-    character(len=50), save     :: filename_regions != "WRF_regions1.dat"  !'WRF_regionscells.dat'  !"WRF_basins.dat" "WRF_regionscells_landocean.dat" 
-    character(len=50), save     :: filename_topomask != 'mask_topo.dat'
-    character(len=50), save     :: filename_PP != '2018_months05to08_PP24.dat'   ! 2018_months05to08_PP24.dat
-    character(len=50), save     :: filename_ET != '2018_months05to08_ET24.dat'
-    character(len=50), save     :: filename_PW != '2018_months05to08_PW24.dat'
-    character(len=50), save     :: filename_U3 != '2018_months05to08_U.dat'
-    character(len=50), save     :: filename_V3 != '2018_months05to08_V.dat'
+    character(len=len_path), save     :: filename_regions != "WRF_regions1.dat"  !'WRF_regionscells.dat'  !"WRF_basins.dat" "WRF_regionscells_landocean.dat" 
+    character(len=len_path), save     :: filename_topomask != 'mask_topo.dat'
+    character(len=len_path), save     :: filename_PP != '2018_months05to08_PP24.dat'   ! 2018_months05to08_PP24.dat
+    character(len=len_path), save     :: filename_ET != '2018_months05to08_ET24.dat'
+    character(len=len_path), save     :: filename_PW != '2018_months05to08_PW24.dat'
+    character(len=len_path), save     :: filename_U3 != '2018_months05to08_U.dat'
+    character(len=len_path), save     :: filename_V3 != '2018_months05to08_V.dat'
     ! character(len=50), save     :: filename_W3U = '2018_WUP.dat'
     ! character(len=50), save     :: filename_W3D = '2018_WDOWN.dat'
     ! character(len=50), save     :: filename_QLIMIT = '2018_Q.dat'
-    character(len=50), save     :: filename_PWflux != '2018_months05to08_PWflux24.dat'
-    character(len=50), save     :: filename_domain_i != 'MW_il.dat'
-    character(len=50), save     :: filename_domain_j != 'MW_jl.dat'
+    character(len=len_path), save     :: filename_PWflux != '2018_months05to08_PWflux24.dat'
+    character(len=len_path), save     :: filename_domain_i != 'MW_il.dat'
+    character(len=len_path), save     :: filename_domain_j != 'MW_jl.dat'
 
 
     !=======================================================
@@ -91,16 +94,16 @@ MODULE global_data
     ! this sections sets the name of the files 
     ! character(len=150), save    :: path_output = '/data/keeling/a/erickkc2/f/SAAG2/test_4km_origmodel/output_basins_nonCPM/'
     ! character(len=150), save    :: path_output = '/data/keeling/a/erickkc2/f/SAAG2/test_4km_origmodel/output_cells_land/'
-    character(len=150), save    :: path_output != '/data/keeling/a/erickkc2/f/SAAG3/02_2LDRM_results/CPM_4km/output_regions1/'
-    character(len=100), save     :: prefix_outfiles
-    character(len=100), save     :: filename_rhodomain_daily = 'rho_domain_daily.csv'
-    character(len=100), save     :: filename_rhocolumn_domain_daily = 'rho_column_domain_daily.csv'
-    character(len=100), save     :: filename_rhocolumn_domain_timeavg = 'rho_column_domain_timeavg.csv'
-    character(len=100), save     :: filename_precipareal_domain_daily = 'precipareal_domain_daily.csv'
-    character(len=100), save     :: filename_paths_xy = "paths_xy.csv"
-    character(len=100), save     :: filename_rhocolumn_grid = "rho_grid.dat"
-    character(len=100), save     :: filename_rhocolumn_grid_base = "rho_grid"
-    character(len=100), save     :: filename_rhoslabs_grid = "rhoslabs_grid.dat"
+    character(len=len_path), save    :: path_output != '/data/keeling/a/erickkc2/f/SAAG3/02_2LDRM_results/CPM_4km/output_regions1/'
+    character(len=len_path), save     :: prefix_outfiles
+    character(len=len_path), save     :: filename_rhodomain_daily = 'rho_domain_daily.csv'
+    character(len=len_path), save     :: filename_rhocolumn_domain_daily = 'rho_column_domain_daily.csv'
+    character(len=len_path), save     :: filename_rhocolumn_domain_timeavg = 'rho_column_domain_timeavg.csv'
+    character(len=len_path), save     :: filename_precipareal_domain_daily = 'precipareal_domain_daily.csv'
+    character(len=len_path), save     :: filename_paths_xy = "paths_xy.csv"
+    character(len=len_path), save     :: filename_rhocolumn_grid = "rho_grid.dat"
+    character(len=len_path), save     :: filename_rhocolumn_grid_base = "rho_grid"
+    character(len=len_path), save     :: filename_rhoslabs_grid = "rhoslabs_grid.dat"
     ! character(len=50), save     :: filename_rhoslabs_domain_timeavg = 'rho_slabs_domain_timeavg.csv'
     
     
@@ -108,12 +111,12 @@ MODULE global_data
     !---------------------- GLOBAL DATA --------------------
     !=======================================================
 
-    character(len=200), save         :: file_regions, &! = trim(path_input) // filename_regions, & !  , file_topomask ! &
+    character(len=len_path), save         :: file_regions, &! = trim(path_input) // filename_regions, & !  , file_topomask ! &
                                         file_topomask, &!= trim(path_input) // filename_topomask, &
                                         file_domain_i, &!= = trim(path_input) // filename_domain_i, &
                                         file_domain_j  ! = trim(path_input) // filename_domain_j
 
-    character(len=200), dimension(:), allocatable, save ::  file_PP, &!= trim(path_input) // filename_PP, &
+    character(len=len_path), dimension(:), allocatable, save ::  file_PP, &!= trim(path_input) // filename_PP, &
                                                             file_ET, &!= trim(path_input) // filename_ET, &
                                                             file_PW, &!=trim(path_input) // filename_PW, &
                                                             file_U3, &!= trim(path_input) // filename_U3, &
@@ -121,7 +124,7 @@ MODULE global_data
                                                             file_PWflux != = trim(path_input) // filename_PWflux, &
                                                 
 
-    character(len=200), save         :: file_rhodomain_daily, &! = trim(path_output) // filename_rhodomain_daily, &
+    character(len=len_path), save         :: file_rhodomain_daily, &! = trim(path_output) // filename_rhodomain_daily, &
                                         file_rhocolumn_domain_daily, &!= trim(path_output) // filename_rhocolumn_domain_daily, &
                                         file_rhocolumn_domain_timeavg, &!= trim(path_output) // filename_rhocolumn_domain_timeavg, &
                                         file_precipareal_domain_daily, & != trim(path_output) // filename_precipareal_domain_daily

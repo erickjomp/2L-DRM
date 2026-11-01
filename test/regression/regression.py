@@ -63,12 +63,14 @@ def prepare_inputs(workdir):
 
 
 def run_model(exe, workdir, outname, extra_args, threads, common_args=COMMON_ARGS):
-    """Run run2LDRM in workdir, writing to workdir/outname. Returns (outdir, error)."""
+    """Run run2LDRM in workdir, writing to workdir/outname. Returns (outdir, error).
+
+    outname must not exist yet: run2LDRM creates it (and its parents)."""
     outdir = workdir / outname
-    outdir.mkdir()
     cmd = [str(exe), "-po", outname] + common_args + extra_args
     env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     result = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True, text=True)
+    outdir.mkdir(parents=True, exist_ok=True)  # for the log, also if the run failed early
     (outdir / "stdout.txt").write_text(result.stdout + result.stderr)
     missing = [f for f in OUTPUTS if not (outdir / f).is_file()]
     if result.returncode != 0 or missing:
