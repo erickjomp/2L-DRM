@@ -65,7 +65,7 @@ program recycling
 
     ! Loading data
     call read_masks()
-    call read_targetregion()
+    ! (the target region is read in read_global_data, as it gives domsize)
     ! call openfile()  
     ! call daily_FLUX()
     call cpu_time(startTime)

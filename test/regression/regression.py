@@ -21,7 +21,7 @@ COMMON_ARGS = [
     "-ET", "ET.txt", "-PP", "PP.txt", "-PW", "PW.txt",
     "-U", "U.txt", "-V", "V.txt", "-PWf", "PWflux.txt",
     "-reg", "regions.dat", "-nreg", str(NREGIONS),
-    "-it", "target_i.dat", "-jt", "target_j.dat", "-ds", str(DOMSIZE),
+    "-it", "target_i.dat", "-jt", "target_j.dat", "-ds", str(DOMSIZE),  # = TARGET_LIST_ARGS
     "-nx", str(NX), "-ny", str(NY), "-dx", str(DX), "-dy", str(DX),
     "-d0", "2018-05-01_00:00:00",
     "-d1", "2018-05-04_00:00:00",  # first step with 3 days of history (= mtr * tdt)
@@ -30,6 +30,18 @@ COMMON_ARGS = [
     "-ddt", "3", "-udt", "3",
     "-ver", ".true.", "-wr", ".true.",
 ]
+
+# The same target region given as a mask (--target) instead of lists of cells
+TARGET_LIST_ARGS = ["-it", "target_i.dat", "-jt", "target_j.dat", "-ds", str(DOMSIZE)]
+TARGET_MASK_ARGS = ["-tg", "target.dat"]
+
+
+def with_target(target_args, common_args=COMMON_ARGS):
+    """common_args with the target-region options replaced by target_args."""
+    start = common_args.index(TARGET_LIST_ARGS[0])
+    assert common_args[start:start + len(TARGET_LIST_ARGS)] == TARGET_LIST_ARGS
+    return common_args[:start] + target_args + common_args[start + len(TARGET_LIST_ARGS):]
+
 
 # Each case adds the options that differ; together they cover both solvers
 # and both next-point methods.

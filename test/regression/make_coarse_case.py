@@ -74,7 +74,9 @@ def main():
     regions = majority(read_static("WRF_amazon.dat"))
     write(args.out / "regions.dat.gz", regions)
 
-    # Target region = coarse cells of region 1, as 1-based (i, j) indices.
+    # Target region = coarse cells of region 1: as a mask (--target, 1 inside and 0 outside)
+    # and as lists of 1-based (i, j) indices (--itarget, --jtarget).
+    write(args.out / "target.dat.gz", (regions == 1).astype("<f4"))
     jj, ii = np.nonzero(regions == 1)
     write(args.out / "target_i.dat.gz", (ii + 1).astype("<f4"))
     write(args.out / "target_j.dat.gz", (jj + 1).astype("<f4"))

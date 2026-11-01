@@ -121,6 +121,7 @@ or together with a configuration file, in which case the command-line arguments 
 ## Preparing input data
 - The data in the input binary files of run2LDRM program should be in Fortran-like memory order (read more about it here https://manik.cc/2021/02/25/memory-order.html). As a rule of thumb, if you want an input binary file with dimensions (nx, ny, nslabs, ntimes) and you are going to write it from a Python numpy array, the numpy array must have dimensions (ntimes, nslabs, ny, nx), where nslabs should be 2.
 - The precipitable water flux at the interslab (PWflux), which has to be provided as an input binary file, can be calculated by $\rho_{air} w_{wind} q$, where $\rho_{air}$ is the density of the air, $w_{wind}$ is the vertical wind velocity and $q$ is the specific humidity at the interslab pressure level.
+- The target region can be given as a mask with `--target` (a binary file with dimensions (nx, ny), 1 inside the target region and 0 outside), from which run2LDRM gets the number of target cells. Alternatively, it can be given as lists of the i and j indices of its cells with `--itarget`, `--jtarget` and `--domsize`. These indices must be 1-based (Fortran indices): indices from Python (e.g. `numpy.nonzero`) start at 0, so add 1 to them.
 - To make the model easier to use, a preprocessing program is also provided (https://github.com/erickjomp/2L-DRM-preprocessing). It takes standard WRF outputs as input and generates the necessary files for running the 2L-DRM.
 
 

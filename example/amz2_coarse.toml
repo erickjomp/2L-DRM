@@ -17,9 +17,7 @@ fileV = "V.txt"
 filePWflux = "PWflux.txt"
 regions = "regions.dat"
 nregions = 2
-itarget = "target_i.dat"
-jtarget = "target_j.dat"
-domsize = 389
+target = "target.dat"   # mask of the target region (1 inside, 0 outside)
 
 [output]
 pathout = "output/"   

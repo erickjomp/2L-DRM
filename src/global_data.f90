@@ -86,6 +86,7 @@ MODULE global_data
     character(len=len_path), save     :: filename_PWflux != '2018_months05to08_PWflux24.dat'
     character(len=len_path), save     :: filename_domain_i != 'MW_il.dat'
     character(len=len_path), save     :: filename_domain_j != 'MW_jl.dat'
+    character(len=len_path), save     :: filename_target    ! mask of the target region (alternative to the lists)
 
 
     !=======================================================
@@ -114,7 +115,8 @@ MODULE global_data
     character(len=len_path), save         :: file_regions, &! = trim(path_input) // filename_regions, &
                                         file_topomask, &  ! empty: no topography mask
                                         file_domain_i, &!= = trim(path_input) // filename_domain_i, &
-                                        file_domain_j  ! = trim(path_input) // filename_domain_j
+                                        file_domain_j, & ! = trim(path_input) // filename_domain_j
+                                        file_target      ! empty: lists of cells (file_domain_i, file_domain_j)
 
     character(len=len_path), dimension(:), allocatable, save ::  file_PP, &!= trim(path_input) // filename_PP, &
                                                             file_ET, &!= trim(path_input) // filename_ET, &

@@ -159,21 +159,36 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop
 
+        call cli%add(switch='--target', &
+                    switch_ab='-tg',    &
+                    help='Binary file containing the mask of the target region. The dimensions must be (nx, ny). &
+                    &Cells with a value other than 0.0 (and NaN) are in the target region, e.g. 1.0 inside and &
+                    &0.0 outside. Give either --target or the three options --itarget, --jtarget and --domsize.',   &
+                    required=.false.,   &
+                    act='store',       &
+                    def='',            &
+                    error=error_cli)
+        if (error_cli/=0) stop
+
         call cli%add(switch='--itarget', &
                     switch_ab='-it',    &
-                    help='Binary file of i grid values of target region. This a unidimensional array with &
-                    &length equal to the number of grid cells in target region.',   &
-                    required=.true.,   &
+                    help='Binary file of the i (x) indices of the target-region cells, 1-based (Fortran) indices. &
+                    &This a unidimensional array with length equal to the number of grid cells in target region. &
+                    &Alternative to --target, with --jtarget and --domsize.',   &
+                    required=.false.,   &
                     act='store',       &
+                    def='',            &
                     error=error_cli)
         if (error_cli/=0) stop
 
         call cli%add(switch='--jtarget', &
                     switch_ab='-jt',    &
-                    help='Binary file of j grid values of target region. This a unidimensional array with &
-                    &length equal to the number of grid cells in target region.',   &
-                    required=.true.,   &
+                    help='Binary file of the j (y) indices of the target-region cells, 1-based (Fortran) indices. &
+                    &This a unidimensional array with length equal to the number of grid cells in target region. &
+                    &Alternative to --target, with --itarget and --domsize.',   &
+                    required=.false.,   &
                     act='store',       &
+                    def='',            &
                     error=error_cli)
         if (error_cli/=0) stop
 
@@ -293,9 +308,11 @@ contains
 
         call cli%add(switch='--domsize', &
                     switch_ab='-ds',    &
-                    help='Number of grid cells within target region',   &
-                    required=.true.,   &
+                    help='Number of grid cells within target region (the length of the --itarget and --jtarget &
+                    &arrays). Not needed with --target, which gives it.',   &
+                    required=.false.,   &
                     act='store',       &
+                    def='0',           &
                     error=error_cli)
         if (error_cli/=0) stop   
 
@@ -580,13 +597,32 @@ contains
             file_topomask = ''
         end if
 
+        call cli%get(switch='-tg', val=filename_target, error=error_cli)
+        if (error_cli/=0) stop
         call cli%get(switch='-it', val=filename_domain_i, error=error_cli)
         if (error_cli/=0) stop
-        file_domain_i = trim(path_input) // filename_domain_i
-
         call cli%get(switch='-jt', val=filename_domain_j, error=error_cli)
         if (error_cli/=0) stop
-        file_domain_j = trim(path_input) // filename_domain_j
+        call cli%get(switch='-ds', val=domsize, error=error_cli)
+        if (error_cli/=0) stop
+        ! the target region is given either as a mask (--target) or as lists of cells (-it, -jt, -ds)
+        if (len_trim(filename_target) > 0) then
+            if (len_trim(filename_domain_i) > 0 .or. len_trim(filename_domain_j) > 0 .or. domsize /= 0) then
+                write(*,'(A)') "Give either --target or --itarget, --jtarget and --domsize, not both."
+                error stop
+            end if
+            file_target = trim(path_input) // filename_target
+            file_domain_i = ''
+            file_domain_j = ''
+        else
+            if (len_trim(filename_domain_i) == 0 .or. len_trim(filename_domain_j) == 0 .or. domsize <= 0) then
+                write(*,'(A)') "The target region is missing: give --target, or --itarget, --jtarget and --domsize."
+                error stop
+            end if
+            file_target = ''
+            file_domain_i = trim(path_input) // filename_domain_i
+            file_domain_j = trim(path_input) // filename_domain_j
+        end if
         
 
         call cli%get(switch='-po', val=path_output, error=error_cli)
@@ -665,8 +701,6 @@ contains
 
 
 
-        call cli%get(switch='-ds', val=domsize, error=error_cli)
-        if (error_cli/=0) stop
         call cli%get(switch='-nreg', val=nregions, error=error_cli)
         if (error_cli/=0) stop
 
@@ -719,7 +753,8 @@ contains
         ! allocate(PW(bigx,bigy,nslabs,n_datadt))
         ! allocate(U3(bigx,bigy,nslabs, n_datadt*24/UV_dt))
         ! allocate(V3(bigx,bigy,nslabs, n_datadt*24/UV_dt))
-        allocate(domain_ij(domsize,2))
+        ! reads the target region: sets domsize (with --target) and domain_ij
+        call read_targetregion()
         ! allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt))
         ! allocate(MASK_PW_FLUX(bigx,bigy,nslabs-1,n_datadt))
 
@@ -1186,23 +1221,64 @@ contains
     end subroutine
 
 
-    ! reads domain
+    ! reads the target region into domain_ij (cells as 1-based (i, j) indices): from the mask
+    ! --target (which also gives domsize), or from the lists of cells --itarget and --jtarget
     subroutine read_targetregion()
-        use global_data, only: domain_ij, domsize, file_domain_i, file_domain_j
-        real, dimension(domsize,2) :: domain2
-        integer :: ii
-        
-        open(14,file=file_domain_i,status='old',form='unformatted',access='direct',recl=4)
-        open(15,file=file_domain_j,status='old',form='unformatted',access='direct',recl=4)
-        do ii = 1,domsize
-            read(14,rec=ii) domain2(ii,1)
-            read(15,rec=ii) domain2(ii,2)
-        enddo
-        domain_ij = int(domain2)
-      
-        write(*,*) 'Study region has been loaded.'
-        close(14)
-        close(15)
+        use global_data, only: domain_ij, domsize, file_domain_i, file_domain_j, file_target, bigx, bigy
+        real(4), dimension(:,:), allocatable :: target2b
+        real(4), dimension(:), allocatable   :: list_i, list_j
+        integer :: i, j, k, nbytes_i, nbytes_j
+
+        if (len_trim(file_target) > 0) then
+            allocate(target2b(bigx, bigy))
+            open(14, file=file_target, status='old', form='unformatted', access='stream')
+            read(14) target2b
+            close(14)
+            ! NaN /= 0 is true, so NaN cells are excluded explicitly (target2b == target2b)
+            domsize = count(target2b /= 0.0 .and. target2b == target2b)
+            if (domsize == 0) then
+                write(*,'(A)') "The target region in '" // trim(file_target) // "' has no cells (all are 0 or NaN)."
+                error stop
+            end if
+            allocate(domain_ij(domsize, 2))
+            ! cells in grid order (i varies fastest), the same order as the lists written by the
+            ! preprocessing programs
+            k = 0
+            do j = 1, bigy
+                do i = 1, bigx
+                    if (target2b(i,j) /= 0.0 .and. target2b(i,j) == target2b(i,j)) then
+                        k = k + 1
+                        domain_ij(k,1) = i
+                        domain_ij(k,2) = j
+                    end if
+                end do
+            end do
+        else
+            inquire(file=file_domain_i, size=nbytes_i)
+            inquire(file=file_domain_j, size=nbytes_j)
+            if (nbytes_i /= 4*domsize .or. nbytes_j /= 4*domsize) then
+                write(*,'(A,I0,A,I0,A,I0,A)') "--itarget and --jtarget must have --domsize = ", domsize, &
+                    " values (float32), but have ", nbytes_i/4, " and ", nbytes_j/4, " (or are missing)."
+                error stop
+            end if
+            allocate(list_i(domsize), list_j(domsize), domain_ij(domsize, 2))
+            open(14, file=file_domain_i, status='old', form='unformatted', access='stream')
+            read(14) list_i
+            close(14)
+            open(15, file=file_domain_j, status='old', form='unformatted', access='stream')
+            read(15) list_j
+            close(15)
+            domain_ij(:,1) = int(list_i)
+            domain_ij(:,2) = int(list_j)
+            if (any(domain_ij(:,1) < 1 .or. domain_ij(:,1) > bigx .or. &
+                    domain_ij(:,2) < 1 .or. domain_ij(:,2) > bigy)) then
+                write(*,'(A,I0,A,I0,A)') "--itarget and --jtarget have indices outside the grid (1..", bigx, &
+                    ", 1..", bigy, "). They must be 1-based (Fortran) indices."
+                error stop
+            end if
+        end if
+
+        write(*,'(A,I0,A)') ' Target region has been loaded: ', domsize, ' cells.'
     end subroutine
 
 

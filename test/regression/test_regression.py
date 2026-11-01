@@ -7,10 +7,14 @@ of the model, so a failure means results changed, not that they are wrong.
 After an intended change in results, rerun with --update-reference and
 commit the new references.
 """
+import subprocess
+from array import array
+
 import pytest
 
-from regression import (CASES, HERE, OUTPUTS, compare_csv, compare_grid,
-                        reference_path, run_model, save_reference)
+from regression import (CASES, HERE, OUTPUTS, TARGET_LIST_ARGS, TARGET_MASK_ARGS,
+                        compare_csv, compare_grid, reference_path, run_model, save_reference,
+                        with_target)
 
 THREADS = 4
 
@@ -40,7 +44,8 @@ def test_same_results_any_thread_count(run_case, case):
 
 def test_toml_config_same_as_flags(exe, inputs, run_case):
     """The example configuration file (example/amz2_coarse.toml) must give the same
-    outputs as the solver3_iterative case given with flags. Its output directory has
+    outputs as the solver3_iterative case given with flags. It gives the target region
+    as a mask (--target) while the flags give lists of cells. Its output directory has
     missing parents, which run2LDRM must create."""
     config = HERE.parent.parent / "example" / "amz2_coarse.toml"
     from_file, error = run_model(exe, inputs, "new_dir/solver3_iterative_toml", [], THREADS,
@@ -71,3 +76,39 @@ def test_topomask_optional(exe, inputs, run_case):
             assert not differing, f"all-ones mask differs from no mask: {differing}"
         else:
             assert differing, "a mask with zeros did not change the results"
+
+
+def test_target_mask_same_as_lists(exe, inputs, run_case):
+    """--target (mask) must give the same outputs as --itarget/--jtarget/--domsize (lists):
+    the cells are visited in the same order, so the outputs are byte-identical."""
+    case = "solver1_direct"
+    outdir, error = run_model(exe, inputs, f"{case}_target_mask", CASES[case], THREADS,
+                              common_args=with_target(TARGET_MASK_ARGS))
+    assert error is None, error
+    from_lists = run_case(case, THREADS)
+    differing = [f for f in OUTPUTS if (outdir / f).read_bytes() != (from_lists / f).read_bytes()]
+    assert not differing, f"outputs differ between --target and the lists of cells: {differing}"
+
+
+def write_list_with_index_zero(inputs):
+    """A list of cells with a 0 index, as 0-based lists (e.g. from the former notebooks)
+    have when the target region touches the first column of the grid."""
+    values = array("f", (inputs / "target_i.dat").read_bytes())
+    values[0] = 0.0
+    (inputs / "target_i0.dat").write_bytes(values.tobytes())
+
+
+@pytest.mark.parametrize("target_args, message", [
+    (TARGET_MASK_ARGS + TARGET_LIST_ARGS, "not both"),
+    ([], "target region is missing"),
+    (TARGET_LIST_ARGS[:4], "target region is missing"),  # no --domsize
+    (TARGET_LIST_ARGS[:-1] + ["100"], "must have --domsize = 100"),
+    (["-it", "target_i0.dat"] + TARGET_LIST_ARGS[2:], "1-based"),
+], ids=["mask_and_lists", "none", "no_domsize", "wrong_domsize", "index_zero"])
+def test_target_options_errors(exe, inputs, target_args, message):
+    """Wrong target-region options must stop the run with a clear message."""
+    write_list_with_index_zero(inputs)
+    cmd = [str(exe), "-po", "target_errors"] + with_target(target_args) + CASES["solver3_iterative"]
+    result = subprocess.run(cmd, cwd=inputs, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert message in result.stdout + result.stderr
