@@ -11,7 +11,7 @@ contains
         use FLAP
         use stdlib_datetime, only: datetime_type, timedelta_type, operator(-), total_seconds
         use toml_config, only : config_argument, toml_to_ini, temporary_ini_name, delete_file
-        use stdlib_system, only: is_directory, make_directory_all
+        use stdlib_system, only: is_directory, make_directory_all, path_sep
         use stdlib_error, only: state_type
 
         type(command_line_interface)                 :: cli    ! Command Line Interface (CLI).
@@ -639,9 +639,11 @@ contains
 
         call cli%get(switch='-po', val=path_output, error=error_cli)
         if (error_cli/=0) stop
-        ! the output directory (and its parents) is created if it does not exist
+        ! the output directory (and its parents) is created if it does not exist. On Windows,
+        ! make_directory_all only splits the path at '\' (it would try to create 'a/b' in one
+        ! step and fail if 'a' does not exist), so '/' is changed to the native separator
         if (.not. is_directory(trim(path_output))) then
-            call make_directory_all(trim(path_output), error_mkdir)
+            call make_directory_all(native_separators(trim(path_output)), error_mkdir)
             if (error_mkdir%error()) then
                 write(*,'(A)') "Cannot create output directory '" // trim(path_output) // "': " // &
                                error_mkdir%print_msg()
@@ -842,6 +844,17 @@ contains
 
 
     contains
+
+        ! path with '/' changed to the separator of the operating system ('\' on Windows)
+        function native_separators(path) result(native)
+            character(len=*), intent(in) :: path
+            character(len=len(path))     :: native
+            integer                      :: i
+            native = path
+            do i = 1, len(native)
+                if (native(i:i) == '/') native(i:i) = path_sep()
+            end do
+        end function
 
         ! files = [path_input // filename], or the files listed in it with --listsfiles .true.
         subroutine input_files(filename, files)
