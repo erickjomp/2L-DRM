@@ -12,9 +12,9 @@ from array import array
 
 import pytest
 
-from regression import (CASES, HERE, OUTPUTS, TARGET_LIST_ARGS, TARGET_MASK_ARGS,
-                        compare_csv, compare_grid, reference_path, run_model, save_reference,
-                        with_target)
+from regression import (CASES, HERE, NC_REGIONS, OUTPUTS,
+                        TARGET_LIST_ARGS, TARGET_MASK_ARGS, compare_csv, compare_grid, netcdf_args,
+                        reference_path, replace_args, run_model, save_reference, with_target)
 
 THREADS = 4
 
@@ -108,7 +108,56 @@ def write_list_with_index_zero(inputs):
 def test_target_options_errors(exe, inputs, target_args, message):
     """Wrong target-region options must stop the run with a clear message."""
     write_list_with_index_zero(inputs)
-    cmd = [str(exe), "-po", "target_errors"] + with_target(target_args) + CASES["solver3_iterative"]
+    assert_fails(exe, inputs, with_target(target_args), message)
+
+
+def assert_fails(exe, inputs, args, message):
+    """run2LDRM with args must stop with an error whose message contains message."""
+    cmd = [str(exe), "-po", "expected_errors"] + args + CASES["solver3_iterative"]
     result = subprocess.run(cmd, cwd=inputs, capture_output=True, text=True)
-    assert result.returncode != 0
-    assert message in result.stdout + result.stderr
+    assert result.returncode != 0, "run2LDRM did not fail"
+    assert message in result.stdout + result.stderr, (result.stdout + result.stderr)[-2000:]
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_netcdf_same_as_binary(exe, inputs, run_case, case):
+    """NetCDF inputs (--input, and --source_regions/--target from the regions file, as written
+    by the preprocessing programs) must give the same outputs as the binary files: they have
+    the same values."""
+    outdir, error = run_model(exe, inputs, f"{case}_netcdf", CASES[case], THREADS,
+                              common_args=netcdf_args())
+    assert error is None, error
+    from_binary = run_case(case, THREADS)
+    differing = [f for f in OUTPUTS if (outdir / f).read_bytes() != (from_binary / f).read_bytes()]
+    assert not differing, f"outputs differ between NetCDF and binary inputs: {differing}"
+
+
+def option(args, name, value):
+    """args with the value of option name replaced."""
+    i = args.index(name)
+    return args[:i + 1] + [value] + args[i + 2:]
+
+
+NC_ARGS = netcdf_args()
+
+
+@pytest.mark.parametrize("args, message", [
+    (option(NC_ARGS, "-nx", "31"), "--nx = 31 but"),
+    (option(NC_ARGS, "-ny", "25"), "--ny = 25 but"),
+    (option(NC_ARGS, "-udt", "1"), "--UV_dt = 1 must be equal to --data_dt"),
+    (option(option(NC_ARGS, "-ddt", "6"), "-udt", "6"), "--data_dt = 6 hours, but the time step"),
+    (option(NC_ARGS, "-d0", "2018-05-01_03:00:00"), "--datetime0 must be the first time"),
+    (option(NC_ARGS, "-in", "input_nc_gap.txt"), "not consecutive"),
+    (option(NC_ARGS, "-nreg", "3"), "--nregions = 3 but"),
+    (NC_ARGS + ["-PP", "PP.txt"], "not both"),
+    (replace_args(["-in", "input_nc.txt"], [], NC_ARGS), "input data is missing"),
+    (option(NC_ARGS, "-in", "input_nc_regions.txt"), "No dimension 'slab' in"),
+    (option(NC_ARGS, "-in", "PP.txt"), "is not a NetCDF file"),
+], ids=["nx", "ny", "UV_dt", "data_dt", "datetime0", "not_consecutive", "nregions",
+        "netcdf_and_binary", "no_input", "regions_as_input", "binary_as_netcdf"])
+def test_netcdf_options_errors(exe, inputs, args, message):
+    """Options that disagree with the NetCDF files must stop the run with a clear message."""
+    first_file = (inputs / "input_nc.txt").read_text().split()[0]
+    (inputs / "input_nc_gap.txt").write_text(f"{first_file}\n{first_file}\n")  # 2nd file starts too early
+    (inputs / "input_nc_regions.txt").write_text(f"{NC_REGIONS}\n")
+    assert_fails(exe, inputs, args, message)

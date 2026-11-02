@@ -36,11 +36,31 @@ TARGET_LIST_ARGS = ["-it", "target_i.dat", "-jt", "target_j.dat", "-ds", str(DOM
 TARGET_MASK_ARGS = ["-tg", "target.dat"]
 
 
+def replace_args(old, new, args=COMMON_ARGS):
+    """args with the consecutive options old replaced by new."""
+    start = args.index(old[0])
+    assert args[start:start + len(old)] == old, f"{old} not in {args}"
+    return args[:start] + new + args[start + len(old):]
+
+
 def with_target(target_args, common_args=COMMON_ARGS):
     """common_args with the target-region options replaced by target_args."""
-    start = common_args.index(TARGET_LIST_ARGS[0])
-    assert common_args[start:start + len(TARGET_LIST_ARGS)] == TARGET_LIST_ARGS
-    return common_args[:start] + target_args + common_args[start + len(TARGET_LIST_ARGS):]
+    return replace_args(TARGET_LIST_ARGS, target_args, common_args)
+
+
+# The same inputs as NetCDF files, as written by the preprocessing programs: --input with the
+# list of the two files of data/ (amz2_coarse_1.nc, amz2_coarse_2.nc), and the source and
+# target regions from amz2_coarse_regions.nc
+INPUT_BIN_ARGS = ["-ET", "ET.txt", "-PP", "PP.txt", "-PW", "PW.txt",
+                  "-U", "U.txt", "-V", "V.txt", "-PWf", "PWflux.txt"]
+NC_REGIONS = "amz2_coarse_regions.nc"
+
+
+def netcdf_args(common_args=COMMON_ARGS):
+    """common_args with all the inputs given as NetCDF files."""
+    args = replace_args(INPUT_BIN_ARGS, ["-in", "input_nc.txt"], common_args)
+    args = replace_args(["-reg", "regions.dat"], ["-reg", NC_REGIONS], args)
+    return with_target(["-tg", NC_REGIONS], args)
 
 
 # Each case adds the options that differ; together they cover both solvers
@@ -64,14 +84,18 @@ GRID_ATOL = 1e-4
 
 
 def prepare_inputs(workdir):
-    """Unzip the case into workdir and write the file lists for -lf .true."""
+    """Unzip the case into workdir, copy its NetCDF files and write the file lists for
+    -lf .true. (one per variable for the binary files, input_nc.txt for the NetCDF files)."""
     for gz in CASE_DIR.glob("*.dat.gz"):
         with gzip.open(gz, "rb") as src, open(workdir / gz.name[:-3], "wb") as dst:
             shutil.copyfileobj(src, dst)
+    for nc in CASE_DIR.glob("*.nc"):
+        shutil.copy(nc, workdir / nc.name)
     for var in ["ET", "PP", "PW", "U", "V", "PWflux"]:
         files = sorted(workdir.glob(f"{var}_*.dat"))
-        # relative names: the model stores paths in short fixed-length strings
         (workdir / f"{var}.txt").write_text("".join(f"{f.name}\n" for f in files))
+    files = sorted(workdir.glob("amz2_coarse_[0-9]*.nc"))
+    (workdir / "input_nc.txt").write_text("".join(f"{f.name}\n" for f in files))
 
 
 def run_model(exe, workdir, outname, extra_args, threads, common_args=COMMON_ARGS):
