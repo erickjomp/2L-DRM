@@ -1,4 +1,6 @@
 MODULE subroutines_IO
+    use netcdf_c, only: is_netcdf_file, nc_open_read, nc_close_file, nc_dimension_length, &
+                        nc_read_real, nc_read_double, nc_text_attribute, nc_int_attribute
 
     implicit none
 
@@ -59,8 +61,8 @@ contains
         call cli%add(switch='--listsfiles', &
                     switch_ab='-lf',    &
                     help='Instead of reading one file at a time, you can read a list of them. &
-                           &Use  .true.   if fileET, filePP, filePW, fileU, fileV, filePWflux are text files containing a list of &
-                           &binary files. &
+                           &Use  .true.   if input (or fileET, filePP, filePW, fileU, fileV, filePWflux) are text files &
+                           &containing a list of NetCDF (or binary) files. &
                            &Use  .false.  if it is only 1 binary file.', &
                     required=.false.,   &
                     def='.false.',     &
@@ -68,13 +70,27 @@ contains
                     error=error_cli)
         if (error_cli/=0) stop   
 
+        call cli%add(switch='--input', &
+                    switch_ab='-in',    &
+                    help='NetCDF file with all the time-varying inputs (PW, U, V, PWflux, PP and ET), as written by &
+                    &prepro2LDRM-metdata (https://github.com/erickjomp/2L-DRM-preprocessing). With --listsfiles .true., &
+                    &a text file with the list of these NetCDF files (e.g. one per month), in time order. &
+                    &Replaces --fileET, --filePP, --filePW, --fileU, --fileV and --filePWflux (binary files). &
+                    &--nx, --ny, --nslabs, --data_dt (= --UV_dt) and --datetime0 must agree with the files.',   &
+                    required=.false.,   &
+                    act='store',       &
+                    def='',            &
+                    error=error_cli)
+        if (error_cli/=0) stop
+
         call cli%add(switch='--fileET', &
                     switch_ab='-ET',    &
                     ! help='Text file containing the list of Evapotranspiration (ET) binary files to read. &
                     help='Evapotranspiration (ET) binary file to read. The data has to have dimensions (nx, ny, nslabs, n_datadt)&
                             & with nslabs = 2.  &
                             &Data at daily time step. Units of mm.',   &
-                    required=.true.,   &
+                    required=.false.,  &
+                    def='',            &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop       
@@ -85,7 +101,8 @@ contains
                     help='Precipitation (PP) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_datadt) &
                             & with nslabs = 2. &
                             &Data at daily time step. Units of mm.',   &
-                    required=.true.,   &
+                    required=.false.,  &
+                    def='',            &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop  
@@ -97,7 +114,8 @@ contains
                     help='Precipitable Water (PW) binary files. The data has to have dimensions (nx, ny, nslabs, n_datadt) &
                             &with nslabs = 2. &
                             &Data at daily time step. Units of mm',   &
-                    required=.true.,   &
+                    required=.false.,  &
+                    def='',            &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop
@@ -109,7 +127,8 @@ contains
                     help='Wind speed U (U) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_timesteps)&
                             & with nslabs = 2. &
                             &Data at UV_dt time step. Units of m/s.',   &
-                    required=.true.,   &
+                    required=.false.,  &
+                    def='',            &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop
@@ -120,7 +139,8 @@ contains
                     help='Wind speed V (V) binary files to read. The data has to have dimensions (nx, ny, nslabs, n_timesteps)&
                             & with nslabs = 2. &
                             &Data at UV_dt time step. Units of m/s.',   &
-                    required=.true.,   &
+                    required=.false.,  &
+                    def='',            &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop
@@ -132,15 +152,17 @@ contains
                     help='PW flux between slabs (PWflux) binary files to read. The data has to have dimensions &
                             & (nx, ny, n_interslabs, n_datadt) with n_interslabs = 1.&
                             &Data at daily time step. Units of mm/day. ',   &
-                    required=.true.,   &
+                    required=.false.,  &
+                    def='',            &
                     act='store',       &
                     error=error_cli)
         if (error_cli/=0) stop
 
 
-        call cli%add(switch='--regions', &
+        call cli%add(switch='--source_regions', &
                     switch_ab='-reg',    &
-                    help='Binary file containing the mask of the source regions to analyze. The dimennsions must be (nx, ny). &
+                    help='Map of the source regions: binary file with dimensions (nx, ny), or NetCDF file with the &
+                    &variable regions (the <prefix>_regions.nc of prepro2LDRM-regions). &
                     &Each region must be represented by a different integer number starting by 1.0 . ',   &
                     required=.true.,   &
                     act='store',       &
@@ -161,7 +183,8 @@ contains
 
         call cli%add(switch='--target', &
                     switch_ab='-tg',    &
-                    help='Binary file containing the mask of the target region. The dimensions must be (nx, ny). &
+                    help='Mask of the target region: binary file with dimensions (nx, ny), or NetCDF file with the &
+                    &variable target (the <prefix>_regions.nc of prepro2LDRM-regions, as for --source_regions). &
                     &Cells with a value other than 0.0 (and NaN) are in the target region, e.g. 1.0 inside and &
                     &0.0 outside. Give either --target or the three options --itarget, --jtarget and --domsize.',   &
                     required=.false.,   &
@@ -531,58 +554,47 @@ contains
         call cli%get(switch='-lf', val=listsfiles, error=error_cli)
         if (error_cli/=0) stop
 
+        ! time-varying inputs: one NetCDF file (or list) with all of them, or one binary file (or list) each
+        call cli%get(switch='-in', val=filename_input, error=error_cli)
+        if (error_cli/=0) stop
         call cli%get(switch='-ET', val=filename_ET, error=error_cli)
         if (error_cli/=0) stop
-        if (listsfiles) then
-            call read_list_files(trim(path_input) //  filename_ET, file_ET, 0) 
-        else 
-            allocate(file_ET(1))
-            file_ET(1) = trim(path_input) // filename_ET
-        end if
-        
         call cli%get(switch='-PP', val=filename_PP, error=error_cli)
         if (error_cli/=0) stop
-        if (listsfiles) then
-            call read_list_files(trim(path_input) // filename_PP, file_PP, 0) 
-        else 
-            allocate(file_PP(1))
-            file_PP(1) = trim(path_input) // filename_PP
-        end if
-
         call cli%get(switch='-PW', val=filename_PW, error=error_cli)
         if (error_cli/=0) stop
-        if (listsfiles) then
-            call read_list_files(trim(path_input) // filename_PW, file_PW, 0) 
-        else 
-            allocate(file_PW(1))
-            file_PW(1) = trim(path_input) // filename_PW
-        end if
-
         call cli%get(switch='-U', val=filename_U3, error=error_cli)
         if (error_cli/=0) stop
-        if (listsfiles) then
-            call read_list_files(trim(path_input) // filename_U3, file_U3, 0) 
-        else 
-            allocate(file_U3(1))
-            file_U3(1) = trim(path_input) // filename_U3
-        end if
-
         call cli%get(switch='-V', val=filename_V3, error=error_cli)
         if (error_cli/=0) stop
-        if (listsfiles) then
-            call read_list_files(trim(path_input) // filename_V3, file_V3, 0) 
-        else 
-            allocate(file_V3(1))
-            file_V3(1) = trim(path_input) // filename_V3
-        end if
-
         call cli%get(switch='-PWf', val=filename_PWflux, error=error_cli)
         if (error_cli/=0) stop
-        if (listsfiles) then
-            call read_list_files(trim(path_input) // filename_PWflux, file_PWflux, 0) 
-        else 
-            allocate(file_PWflux(1))
-            file_PWflux(1) = trim(path_input) // filename_PWflux
+        input_netcdf = len_trim(filename_input) > 0
+        if (input_netcdf) then
+            if (any(len_trim([filename_ET, filename_PP, filename_PW, filename_U3, filename_V3, filename_PWflux]) > 0)) then
+                write(*,'(A)') "Give either --input (NetCDF) or --fileET, --filePP, --filePW, --fileU, --fileV and &
+                               &--filePWflux (binary), not both."
+                error stop
+            end if
+            ! all the variables are read from the same files
+            call input_files(filename_input, file_PP)
+            file_ET = file_PP
+            file_PW = file_PP
+            file_U3 = file_PP
+            file_V3 = file_PP
+            file_PWflux = file_PP
+        else
+            if (any(len_trim([filename_ET, filename_PP, filename_PW, filename_U3, filename_V3, filename_PWflux]) == 0)) then
+                write(*,'(A)') "The input data is missing: give --input (NetCDF), or --fileET, --filePP, --filePW, &
+                               &--fileU, --fileV and --filePWflux (binary)."
+                error stop
+            end if
+            call input_files(filename_ET, file_ET)
+            call input_files(filename_PP, file_PP)
+            call input_files(filename_PW, file_PW)
+            call input_files(filename_U3, file_U3)
+            call input_files(filename_V3, file_V3)
+            call input_files(filename_PWflux, file_PWflux)
         end if
 
         call cli%get(switch='-reg', val=filename_regions, error=error_cli)
@@ -753,6 +765,10 @@ contains
         ! allocate(PW(bigx,bigy,nslabs,n_datadt))
         ! allocate(U3(bigx,bigy,nslabs, n_datadt*24/UV_dt))
         ! allocate(V3(bigx,bigy,nslabs, n_datadt*24/UV_dt))
+        ! NetCDF inputs: the options must agree with the files
+        if (input_netcdf) call check_netcdf_inputs()
+        if (is_netcdf_file(trim(file_regions))) call check_nregions_netcdf()
+
         ! reads the target region: sets domsize (with --target) and domain_ij
         call read_targetregion()
         ! allocate(PW_FLUX(bigx,bigy,nslabs-1,n_datadt))
@@ -822,6 +838,22 @@ contains
 
         filename_rhoslabs_grid = trim(prefix_outfiles) // filename_rhoslabs_grid
         file_rhoslabs_grid = trim(path_output) // "/" // filename_rhoslabs_grid
+
+
+
+    contains
+
+        ! files = [path_input // filename], or the files listed in it with --listsfiles .true.
+        subroutine input_files(filename, files)
+            character(len=*), intent(in)                     :: filename
+            character(len=len_path), allocatable, intent(out) :: files(:)
+            if (listsfiles) then
+                call read_list_files(trim(path_input) // filename, files, 0)
+            else
+                allocate(files(1))
+                files(1) = trim(path_input) // filename
+            end if
+        end subroutine
 
     end subroutine
 
@@ -1008,15 +1040,156 @@ contains
     end subroutine
 
     function get_n_datadt_file_PP(i_file) result(n_datadt)
-        use global_data, only : nbytes_real,file_PP, bigx, bigy
+        use global_data, only : nbytes_real,file_PP, bigx, bigy, input_netcdf
         integer, intent(in)  :: i_file
         integer(8)           :: file_size
-        integer              :: n_datadt
+        integer              :: n_datadt, ncid
+
+        if (input_netcdf) then
+            ncid = nc_open_read(trim(file_PP(i_file)))
+            n_datadt = nc_dimension_length(ncid, 'time', trim(file_PP(i_file)))
+            call nc_close_file(ncid)
+            return
+        end if
         
         INQUIRE(FILE=file_PP(i_file), SIZE=file_size)
         
         n_datadt = file_size / (nbytes_real * bigx * bigy) 
     end function
+
+    ! checks that the options agree with the NetCDF input files (--input): grid, slabs,
+    ! time step and the times of the files (consecutive, starting at --datetime0)
+    subroutine check_netcdf_inputs()
+        use global_data, only : file_PP, bigx, bigy, nslabs, data_dt, UV_dt, datetime0
+        use stdlib_datetime, only: datetime_type, operator(-), total_seconds
+        integer                       :: i_file, ncid, nt, n_before, i
+        character(len=:), allocatable :: path, units
+        real(8), allocatable          :: hours(:)
+        real(8)                       :: offset_seconds
+        type(datetime_type)           :: time_origin
+
+        if (UV_dt /= data_dt) then
+            write(*,'(A,I0,A,I0,A)') "--UV_dt = ", UV_dt, " must be equal to --data_dt = ", data_dt, &
+                " with --input: U and V have the same time steps as the other variables in the NetCDF files."
+            error stop
+        end if
+
+        n_before = 0
+        do i_file = 1, size(file_PP)
+            path = trim(file_PP(i_file))
+            if (.not. is_netcdf_file(path)) then
+                write(*,'(A)') "--input: '" // path // "' is not a NetCDF file (or does not exist)."
+                error stop
+            end if
+            ncid = nc_open_read(path)
+            call check_dimension('west_east', bigx, '--nx')
+            call check_dimension('south_north', bigy, '--ny')
+            call check_dimension('slab', nslabs, '--nslabs')
+            if (nslabs > 1) call check_dimension('interslab', nslabs - 1, '--nslabs - 1')
+
+            nt = nc_dimension_length(ncid, 'time', path)
+            allocate(hours(nt))
+            call nc_read_double(ncid, 'time', path, [nt], hours)
+            units = nc_text_attribute(ncid, 'time', 'units', path)
+            if (index(units, 'hours since ') /= 1) then
+                write(*,'(A)') "The time units of '" // path // "' are '" // units // &
+                               "', expected 'hours since YYYY-MM-DD hh:mm:ss'."
+                error stop
+            end if
+            time_origin = parse_datetime(trim(units(len('hours since ') + 1:)))
+
+            do i = 2, nt
+                if (abs(hours(i) - hours(i-1) - data_dt) > 1.0d-6) then
+                    write(*,'(A,I0,A,G0,A)') "--data_dt = ", data_dt, " hours, but the time step of '" // path // &
+                        "' is ", hours(i) - hours(i-1), " hours."
+                    error stop
+                end if
+            end do
+            ! seconds from datetime0 to the first time of this file: the steps of the previous files
+            offset_seconds = total_seconds(time_origin - datetime0) + hours(1) * 3600.0d0
+            if (abs(offset_seconds - n_before * data_dt * 3600.0d0) > 1.0d-3) then
+                if (i_file == 1) then
+                    write(*,'(A,G0,A)') "--datetime0 must be the first time of '" // path // "' (", &
+                        hours(1), " " // units // ")."
+                else
+                    write(*,'(A)') "The NetCDF files of --input are not consecutive: '" // path // &
+                        "' does not start one time step after the end of the previous file."
+                end if
+                error stop
+            end if
+            n_before = n_before + nt
+            deallocate(hours)
+            call nc_close_file(ncid)
+        end do
+
+    contains
+
+        subroutine check_dimension(name, expected, option)
+            character(len=*), intent(in) :: name, option
+            integer, intent(in)          :: expected
+            integer                      :: length
+            length = nc_dimension_length(ncid, name, path)
+            if (length /= expected) then
+                write(*,'(A,I0,A,I0,A)') option // " = ", expected, " but '" // path // "' has " // name // " = ", &
+                    length, "."
+                error stop
+            end if
+        end subroutine
+    end subroutine
+
+    ! checks --nregions against the nregions attribute of a NetCDF --source_regions file
+    subroutine check_nregions_netcdf()
+        use global_data, only : file_regions, nregions
+        integer :: ncid, nregions_file
+        logical :: found
+
+        ncid = nc_open_read(trim(file_regions))
+        call nc_int_attribute(ncid, 'nregions', nregions_file, found)
+        call nc_close_file(ncid)
+        if (found .and. nregions_file /= nregions) then
+            write(*,'(A,I0,A,I0,A)') "--nregions = ", nregions, " but '" // trim(file_regions) // &
+                "' has nregions = ", nregions_file, "."
+            error stop
+        end if
+    end subroutine
+
+    ! reads one time-varying input of one file into values, of Fortran shape var_shape (the whole
+    ! file): a float32 binary file, or variable varname of a NetCDF file (--input)
+    subroutine read_input(file, varname, var_shape, values)
+        use global_data, only : input_netcdf
+        character(len=*), intent(in)  :: file, varname
+        integer, intent(in)           :: var_shape(:)
+        real(4), intent(out)          :: values(product(var_shape))
+        integer                       :: unit, ncid
+
+        if (input_netcdf) then
+            ncid = nc_open_read(trim(file))
+            call nc_read_real(ncid, varname, trim(file), var_shape, values)
+            call nc_close_file(ncid)
+        else
+            open(newunit=unit, file=file, status='old', form='unformatted', access='stream')
+            read(unit) values
+            close(unit)
+        end if
+    end subroutine
+
+    ! reads a (nx, ny) map: a float32 binary file, or variable varname of a NetCDF file
+    subroutine read_map(file, varname, map)
+        use global_data, only : bigx, bigy
+        character(len=*), intent(in)  :: file, varname
+        real(4), intent(out)          :: map(bigx, bigy)
+        integer                       :: unit, ncid
+
+        if (is_netcdf_file(trim(file))) then
+            ncid = nc_open_read(trim(file))
+            call nc_read_real(ncid, varname, trim(file), [bigx, bigy], map)
+            call nc_close_file(ncid)
+        else
+            open(newunit=unit, file=file, status='old', form='unformatted', access='stream')
+            read(unit) map
+            close(unit)
+        end if
+    end subroutine
 
     subroutine check_and_update_globalarrays(day, max_iday_array, i_file)
         use global_data, only :    n_datadt_tracing
@@ -1072,9 +1245,7 @@ contains
             write(*,*) 'No topography mask given: 1-layer cells are only those where PWflux is NaN.'
         end if
 
-        open(112,file=file_regions,status='old',form='unformatted',access='stream')
-        read(112) regions2b
-        close(112)
+        call read_map(file_regions, 'regions', regions2b)
         write(*,*) 'Regions Map has been loaded.'
 
         MAP_REGIONS = int(regions2b)
@@ -1105,27 +1276,21 @@ contains
         i_dt = (day  -1 )* data_dt / UV_dt + 1
 
         ! call cpu_time(startTime)
-        open(10, file = file_PP(i_file), status='old',form='unformatted',access='stream')
         ! if (i_file == 1) then
         if (is_first_readfile) then
-            read(10) PP
-            close(10)
+            call read_input(file_PP(i_file), 'PP', shape(PP), PP)
         else
             PP(:,:,:day-1) = temp_PP
-            read(10) PP(:,:,day:)
-            close(10)
+            call read_input(file_PP(i_file), 'PP', shape(PP(:,:,day:)), PP(:,:,day:))
         end if
 
         
-        open(10, file = file_ET(i_file), status='old',form='unformatted',access='stream')
         ! if (i_file == 1) then
         if (is_first_readfile) then
-            read(10) ET
-            close(10)
+            call read_input(file_ET(i_file), 'ET', shape(ET), ET)
         else
             ET(:,:,:day-1) = temp_ET
-            read(10) ET(:,:,day:)
-            close(10)
+            call read_input(file_ET(i_file), 'ET', shape(ET(:,:,day:)), ET(:,:,day:))
         end if
         ! ET = ET / 8 ! MODIFIED2025
 
@@ -1147,15 +1312,12 @@ contains
         ! call cpu_time(stopTime)
         ! print *, "Total time new: ", stopTime - startTime
 
-        open(10,  file = file_PW(i_file), status='old',form='unformatted',access='stream')
         ! if (i_file == 1) then
         if (is_first_readfile) then
-            read(10) PW
-            close(10)
+            call read_input(file_PW(i_file), 'PW', shape(PW), PW)
         else
             PW(:,:,:,:day-1) = temp_PW
-            read(10) PW(:,:,:,day:)
-            close(10)
+            call read_input(file_PW(i_file), 'PW', shape(PW(:,:,:,day:)), PW(:,:,:,day:))
         end if
 
         ! START REMOVE
@@ -1178,39 +1340,30 @@ contains
         end do
         ! END REMOVE
 
-        open(10,  file = file_U3(i_file), status='old',form='unformatted',access='stream')
         ! if (i_file == 1) then
         if (is_first_readfile) then
-            read(10) U3
-            close(10)
+            call read_input(file_U3(i_file), 'U', shape(U3), U3)
         else
             U3(:,:,:,:i_dt-1) = temp_U3
-            read(10) U3(:,:,:,i_dt:)
-            close(10)
+            call read_input(file_U3(i_file), 'U', shape(U3(:,:,:,i_dt:)), U3(:,:,:,i_dt:))
         end if
 
 
-        open(10,  file = file_V3(i_file), status='old',form='unformatted',access='stream')
         ! if (i_file == 1) then
         if (is_first_readfile) then
-            read(10) V3
-            close(10)
+            call read_input(file_V3(i_file), 'V', shape(V3), V3)
         else
             V3(:,:,:,:i_dt-1) = temp_V3
-            read(10) V3(:,:,:,i_dt:)
-            close(10)
+            call read_input(file_V3(i_file), 'V', shape(V3(:,:,:,i_dt:)), V3(:,:,:,i_dt:))
         end if
 
 
-        open(10,  file = file_PWflux(i_file), status='old',form='unformatted',access='stream')
         ! if (i_file == 1) then
         if (is_first_readfile) then
-            read(10) PW_FLUX
-            close(10)
+            call read_input(file_PWflux(i_file), 'PWflux', shape(PW_FLUX), PW_FLUX)
         else
             PW_FLUX(:,:,:,:day-1) = temp_PW_FLUX
-            read(10) PW_FLUX(:,:,:,day:)
-            close(10)
+            call read_input(file_PWflux(i_file), 'PWflux', shape(PW_FLUX(:,:,:,day:)), PW_FLUX(:,:,:,day:))
         end if
 
         if (is_first_readfile) then
@@ -1231,9 +1384,7 @@ contains
 
         if (len_trim(file_target) > 0) then
             allocate(target2b(bigx, bigy))
-            open(14, file=file_target, status='old', form='unformatted', access='stream')
-            read(14) target2b
-            close(14)
+            call read_map(file_target, 'target', target2b)
             ! NaN /= 0 is true, so NaN cells are excluded explicitly (target2b == target2b)
             domsize = count(target2b /= 0.0 .and. target2b == target2b)
             if (domsize == 0) then

@@ -5,24 +5,20 @@ on:
   pull_request:
   workflow_dispatch:
 
+# 2L-DRM links the NetCDF-C library (libnetcdf), which works with any Fortran compiler:
+# Ubuntu's libnetcdf-dev for gfortran and ifx, and MSYS2's netcdf package on Windows.
+
 jobs:
-  regression:
-    name: ${{ matrix.os }} ${{ matrix.toolchain.compiler }} ${{ matrix.profile }}
-    runs-on: ${{ matrix.os }}
-    # Windows is not officially supported yet: run it, but do not fail the workflow
-    continue-on-error: ${{ matrix.experimental }}
+  linux:
+    name: ubuntu ${{ matrix.toolchain.compiler }} ${{ matrix.profile }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
         toolchain:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2025.0'}
         profile: [debug, release]
-        experimental: [false]
-        include:
-          - {os: windows-latest, toolchain: {compiler: gcc, version: 13}, profile: debug, experimental: true}
-          - {os: windows-latest, toolchain: {compiler: gcc, version: 13}, profile: release, experimental: true}
     defaults:
       run:
         shell: bash
@@ -34,6 +30,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+
+      - name: Install NetCDF-C
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnetcdf-dev
 
       - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
@@ -57,3 +58,47 @@ jobs:
         run: |
           exe=$(fpm run run2LDRM $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }} --runner echo | tail -1)
           python -m pytest test/regression -v --exe "$exe"
+
+  windows:
+    name: windows MSYS2 gfortran ${{ matrix.profile }}
+    runs-on: windows-latest
+    # Windows is not officially supported yet: run it, but do not fail the workflow
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [debug, release]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc-fortran
+            mingw-w64-ucrt-x86_64-netcdf
+            mingw-w64-ucrt-x86_64-fpm
+
+      - name: Build
+        run: |
+          fpm build --profile ${{ matrix.profile }} --compiler gfortran
+          exe=$(fpm run run2LDRM --profile ${{ matrix.profile }} --compiler gfortran --runner echo | tail -1)
+          echo "EXE=$(cygpath -w "$(realpath "$exe")")" >> "$GITHUB_ENV"
+
+      # native Windows Python; the program needs the MSYS2 DLLs (libgfortran, libnetcdf...) in PATH
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Regression test
+        shell: pwsh
+        run: |
+          $env:PATH = "${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin;" + $env:PATH
+          python -m pip install pytest
+          python -m pytest test/regression -v --exe "$env:EXE"

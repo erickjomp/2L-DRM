@@ -9,6 +9,9 @@ auto-executables = true
 auto-tests = true
 auto-examples = true
 module-naming = false
+# NetCDF-C library (NetCDF input, src/netcdf_c.f90). If it is not in the default library
+# path, build with --link-flag "-L$(nc-config --libdir)"
+link = ["netcdf"]
 [install]
 library = false
 [fortran]

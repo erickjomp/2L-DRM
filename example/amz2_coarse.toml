@@ -15,7 +15,7 @@ filePW = "PW.txt"
 fileU = "U.txt"
 fileV = "V.txt"
 filePWflux = "PWflux.txt"
-regions = "regions.dat"
+source_regions = "regions.dat"
 nregions = 2
 target = "target.dat"   # mask of the target region (1 inside, 0 outside)
 

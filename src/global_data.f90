@@ -87,6 +87,8 @@ MODULE global_data
     character(len=len_path), save     :: filename_domain_i != 'MW_il.dat'
     character(len=len_path), save     :: filename_domain_j != 'MW_jl.dat'
     character(len=len_path), save     :: filename_target    ! mask of the target region (alternative to the lists)
+    character(len=len_path), save     :: filename_input     ! NetCDF input (alternative to the binary files)
+    logical, save                     :: input_netcdf = .false.  ! time-varying inputs from NetCDF files (--input)
 
 
     !=======================================================
