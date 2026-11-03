@@ -10,8 +10,10 @@
 ! (west_east, south_north, slab, time), the same memory order as the binary inputs.
 ! All the procedures here take shapes, dimensions, start indices and counts in Fortran
 ! order (and 1-based start indices), and reverse them for NetCDF-C.
+! Array sizes are computed as 64-bit integers: one input variable can have more than
+! 2**31 values (e.g. 1055 x 863 x 2 slabs x 1224 time steps).
 module netcdf_c
-    use, intrinsic :: iso_fortran_env, only: int8
+    use, intrinsic :: iso_fortran_env, only: int8, int64
     use, intrinsic :: iso_c_binding, only: c_int, c_size_t, c_float, c_double, c_char, &
                                             c_ptr, c_null_char, c_f_pointer, c_associated
     implicit none
@@ -253,7 +255,7 @@ contains
         integer, intent(in)          :: ncid
         character(len=*), intent(in) :: name, path
         integer, intent(in)          :: var_shape(:)
-        real(c_float), intent(out)   :: values(product(var_shape))
+        real(c_float), intent(out)   :: values(product(int(var_shape, int64)))
         integer(c_int)               :: varid
 
         varid = variable_with_shape(ncid, name, path, var_shape)
@@ -265,7 +267,7 @@ contains
         integer, intent(in)          :: ncid
         character(len=*), intent(in) :: name, path
         integer, intent(in)          :: var_shape(:)
-        real(c_double), intent(out)  :: values(product(var_shape))
+        real(c_double), intent(out)  :: values(product(int(var_shape, int64)))
         integer(c_int)               :: varid
 
         varid = variable_with_shape(ncid, name, path, var_shape)
@@ -398,21 +400,21 @@ contains
     ! indices start (Fortran order)
     subroutine nc_write_real(ncid, varid, start, counts, values)
         integer, intent(in)       :: ncid, varid, start(:), counts(:)
-        real(c_float), intent(in) :: values(product(counts))
+        real(c_float), intent(in) :: values(product(int(counts, int64)))
         call check(nc_put_vara_float(int(ncid, c_int), int(varid, c_int), c_start(start), c_count(counts), values), &
                    "Cannot write a NetCDF variable")
     end subroutine
 
     subroutine nc_write_double(ncid, varid, start, counts, values)
         integer, intent(in)        :: ncid, varid, start(:), counts(:)
-        real(c_double), intent(in) :: values(product(counts))
+        real(c_double), intent(in) :: values(product(int(counts, int64)))
         call check(nc_put_vara_double(int(ncid, c_int), int(varid, c_int), c_start(start), c_count(counts), values), &
                    "Cannot write a NetCDF variable")
     end subroutine
 
     subroutine nc_write_int(ncid, varid, start, counts, values)
         integer, intent(in)        :: ncid, varid, start(:), counts(:)
-        integer(c_int), intent(in) :: values(product(counts))
+        integer(c_int), intent(in) :: values(product(int(counts, int64)))
         call check(nc_put_vara_int(int(ncid, c_int), int(varid, c_int), c_start(start), c_count(counts), values), &
                    "Cannot write a NetCDF variable")
     end subroutine

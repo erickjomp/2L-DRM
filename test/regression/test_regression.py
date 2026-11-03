@@ -192,17 +192,19 @@ def test_netcdf_output(exe, inputs, run_case):
 
 
 def test_rho_grid_monthly_files(exe, inputs, run_case):
-    """--writerhogrid_option 2 writes one rho grid per month, named by the month. With the
-    dates moved 4 days earlier (the data is the same), the run starts on 2018-04-30: the
-    two monthly files together must be the rho grid of the whole run."""
+    """--writerhogrid_option 2 writes one rho grid per month, named by its first and last
+    days. With the dates moved 4 days earlier (the data is the same), the run goes from
+    2018-04-30 to 2018-05-03: the two monthly files together must be the rho grid of the
+    whole run."""
     case = "solver3_iterative"
     args = option(option(option(COMMON_ARGS, "-d0", "2018-04-27_00:00:00"),
                          "-d1", "2018-04-30_00:00:00"), "-d2", "2018-05-03_21:00:00")
-    outputs = [f for f in OUTPUTS if f != "rho_grid.dat"] + ["rho_grid_2018-04.dat", "rho_grid_2018-05.dat"]
+    outputs = [f for f in OUTPUTS if f != "rho_grid.dat"] + ["rho_grid_2018-04-30_2018-04-30.dat",
+                                                              "rho_grid_2018-05-01_2018-05-03.dat"]
     outdir, error = run_model(exe, inputs, f"{case}_monthly", CASES[case] + ["-wro", "2"], THREADS,
                               common_args=args, outputs=outputs)
     assert error is None, error
-    april = (outdir / "rho_grid_2018-04.dat").read_bytes()
-    may = (outdir / "rho_grid_2018-05.dat").read_bytes()
+    april = (outdir / "rho_grid_2018-04-30_2018-04-30.dat").read_bytes()
+    may = (outdir / "rho_grid_2018-05-01_2018-05-03.dat").read_bytes()
     assert len(april) == 8 * 2 * 26 * 32 * 4, "April must have the 8 steps of 2018-04-30"
     assert april + may == (run_case(case, THREADS) / "rho_grid.dat").read_bytes()

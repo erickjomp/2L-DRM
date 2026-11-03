@@ -130,7 +130,7 @@ or together with a configuration file, in which case the command-line arguments 
 ## Outputs
 `run2LDRM` writes to the output directory (`--pathout`):
 - CSV files with time series of $\rho$ averaged over the target region, for each source region: `rho_column_domain_daily.csv` (column $\rho$, both slabs), `rho_domain_daily.csv` (each slab), `rho_column_domain_timeavg.csv` (averaged over the whole period), and the precipitation over the target region, `precipareal_domain_daily.csv`.
-- With `--writerhogrid .true.`, the grid of column $\rho$ of every target cell, for each source region and time step: by default a NetCDF file, `rho_grid.nc`, with the variable `rho(time, region, south_north, west_east)` (NaN outside the target region), its time, and the latitude and longitude (`XLAT`, `XLONG`) of the NetCDF inputs. With `--outformat bin` it is written as a float32 binary file, `rho_grid.dat`, with dimensions (nx, ny, nregions, time) in Fortran order. `--writerhogrid_option 2` writes one file per month, named by the month (e.g. `rho_grid_2018-05.nc`).
+- With `--writerhogrid .true.`, the grid of column $\rho$ of every target cell, for each source region and time step: by default a NetCDF file, `rho_grid.nc`, with the variable `rho(time, region, south_north, west_east)` (NaN outside the target region), its time, and the latitude and longitude (`XLAT`, `XLONG`) of the NetCDF inputs. With `--outformat bin` it is written as a float32 binary file, `rho_grid.dat`, with dimensions (nx, ny, nregions, time) in Fortran order. `--writerhogrid_option 2` writes one file per month, named by its first and last days with data (e.g. `rho_grid_2018-05-04_2018-05-31.nc` if the run starts on May 4).
 
 
 ## Preparing input data

@@ -528,8 +528,9 @@ contains
 
         call cli%add(switch='--writerhogrid_option', &
                 switch_ab='-wro',    &
-                help='Use option 2 to write the rho grid in one file per month, named by the month &
-                      &(e.g. rho_grid_2018-05.nc). Option 1 (default) writes everything to 1 file.', &
+                help='Use option 2 to write the rho grid in one file per month, named by its first and &
+                      &last days (e.g. rho_grid_2018-05-04_2018-05-31.nc). Option 1 (default) writes everything &
+                      &to 1 file.', &
                 required=.false.,   &
                 act='store',       &
                 def='1',           &
@@ -1187,9 +1188,11 @@ contains
     ! file): a float32 binary file, or variable varname of a NetCDF file (--input)
     subroutine read_input(file, varname, var_shape, values)
         use global_data, only : input_netcdf
+        use, intrinsic :: iso_fortran_env, only: int64
         character(len=*), intent(in)  :: file, varname
         integer, intent(in)           :: var_shape(:)
-        real(4), intent(out)          :: values(product(var_shape))
+        ! 64-bit size: a variable of a long file can have more than 2**31 values
+        real(4), intent(out)          :: values(product(int(var_shape, int64)))
         integer                       :: unit, ncid
 
         if (input_netcdf) then
@@ -1812,7 +1815,8 @@ contains
                                  path_output, prefix_outfiles, outformat, datetime0
 
         use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
-        use stdlib_datetime, only: datetime_type, operator(-), total_seconds
+        use stdlib_datetime, only: datetime_type, timedelta, operator(+), operator(-), total_seconds, &
+                                   days_in_month
         implicit none
         real(4)                                           :: nan
         logical, save                                     :: first_time = .true.
@@ -1822,7 +1826,9 @@ contains
         type(datetime_type), intent(in)                   :: datetime_c
         integer                                           :: year_month
         integer, save                                     :: old_year_month = 0
-        character(len=7)                                  :: month_str
+        character(len=21)                                 :: range_str
+        integer                                           :: last_day
+        type(datetime_type)                               :: datetime_end
         ! NetCDF file: id (-1 if no file is open), ids of rho and time, time steps written
         integer, save                                     :: ncid = -1, varid_rho, varid_time, i_time
         real(8)                                           :: hours
@@ -1833,14 +1839,22 @@ contains
         t_data = 1 + nint(hours) / data_dt
 
         if (write_rho_grid_option == 2) then
-            ! one file per month, named by the month (e.g. rho_grid_2018-05.nc), as the files of
-            ! prepro2LDRM-metdata with --split month: no ":" (not allowed in Windows file names)
+            ! one file per month, named by its first and last days with data, e.g.
+            ! rho_grid_2018-05-04_2018-05-31.nc (no ":", which Windows file names do not allow)
             year_month = 100 * datetime_c%year + datetime_c%month
             if (year_month /= old_year_month) then
                 first_time = .true.
-                write(month_str, '(i4.4,"-",i2.2)') datetime_c%year, datetime_c%month
+                ! last day: the end of the month, or of the run (--datetime_end) if it ends this month
+                datetime_end = datetime0 + timedelta(hours = data_dt * (t_data_end - 1))
+                if (100 * datetime_end%year + datetime_end%month == year_month) then
+                    last_day = datetime_end%day
+                else
+                    last_day = days_in_month(datetime_c%month, datetime_c%year)
+                end if
+                write(range_str, '(i4.4,"-",i2.2,"-",i2.2,"_",i4.4,"-",i2.2,"-",i2.2)') &
+                    datetime_c%year, datetime_c%month, datetime_c%day, datetime_c%year, datetime_c%month, last_day
                 filename_rhocolumn_grid = trim(prefix_outfiles) // trim(filename_rhocolumn_grid_base) // &
-                                          "_" // month_str // merge(".nc ", ".dat", outformat == "nc")
+                                          "_" // range_str // merge(".nc ", ".dat", outformat == "nc")
                 file_rhocolumn_grid = trim(path_output) // "/" // filename_rhocolumn_grid
             end if
             old_year_month = year_month
