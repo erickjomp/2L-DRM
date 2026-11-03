@@ -12,7 +12,7 @@ from array import array
 
 import pytest
 
-from regression import (CASES, HERE, NC_REGIONS, OUTPUTS,
+from regression import (CASES, COMMON_ARGS, HERE, NC_REGIONS, OUTPUTS,
                         TARGET_LIST_ARGS, TARGET_MASK_ARGS, compare_csv, compare_grid, netcdf_args,
                         reference_path, replace_args, run_model, save_reference, with_target)
 
@@ -48,8 +48,9 @@ def test_toml_config_same_as_flags(exe, inputs, run_case):
     as a mask (--target) while the flags give lists of cells. Its output directory has
     missing parents, which run2LDRM must create."""
     config = HERE.parent.parent / "example" / "amz2_coarse.toml"
+    # -of bin overrides the file (NetCDF rho grid, the default) with the format of the flags run
     from_file, error = run_model(exe, inputs, "new_dir/solver3_iterative_toml", [], THREADS,
-                                 common_args=["--config", str(config)])
+                                 common_args=["--config", str(config), "-of", "bin"])
     assert error is None, error
     from_flags = run_case("solver3_iterative", THREADS)
     differing = [f for f in OUTPUTS if (from_file / f).read_bytes() != (from_flags / f).read_bytes()]
@@ -161,3 +162,47 @@ def test_netcdf_options_errors(exe, inputs, args, message):
     (inputs / "input_nc_gap.txt").write_text(f"{first_file}\n{first_file}\n")  # 2nd file starts too early
     (inputs / "input_nc_regions.txt").write_text(f"{NC_REGIONS}\n")
     assert_fails(exe, inputs, args, message)
+
+
+def test_netcdf_output(exe, inputs, run_case):
+    """The rho grid as NetCDF (--outformat nc, the default) must have the same values as the
+    binary rho_grid.dat, with its time, region and the XLAT/XLONG of the NetCDF inputs."""
+    netCDF4 = pytest.importorskip("netCDF4")
+    case = "solver3_iterative"
+    outputs = [f for f in OUTPUTS if f != "rho_grid.dat"] + ["rho_grid.nc"]
+    outdir, error = run_model(exe, inputs, f"{case}_netcdf_output", CASES[case], THREADS,
+                              common_args=option(netcdf_args(), "-of", "nc"), outputs=outputs)
+    assert error is None, error
+    binary = array("f", (run_case(case, THREADS) / "rho_grid.dat").read_bytes())
+    with netCDF4.Dataset(outdir / "rho_grid.nc") as nc:
+        rho = nc["rho"]
+        assert rho.dimensions == ("time", "region", "south_north", "west_east")
+        nt, nreg, ny, nx = rho.shape
+        assert (nreg, ny, nx) == (2, 26, 32)
+        assert nt * nreg * ny * nx == len(binary)
+        # same memory order as the binary file: (nx, ny, nregions, time) in Fortran
+        values = rho[:].filled(float("nan")).astype("<f4").tobytes()
+        assert values == binary.tobytes(), "rho differs from the binary rho grid"
+        assert list(nc["region"][:]) == [1, 2]
+        # 2018-05-04 00:00 (-d1) to 2018-05-07 21:00 (-d2), 3-hourly, in hours since -d0
+        assert nc["time"].units == "hours since 2018-05-01 00:00:00"
+        assert list(nc["time"][:]) == [72 + 3 * i for i in range(nt)]
+        assert nt == 32
+        assert "XLAT" in nc.variables and "XLONG" in nc.variables
+
+
+def test_rho_grid_monthly_files(exe, inputs, run_case):
+    """--writerhogrid_option 2 writes one rho grid per month, named by the month. With the
+    dates moved 4 days earlier (the data is the same), the run starts on 2018-04-30: the
+    two monthly files together must be the rho grid of the whole run."""
+    case = "solver3_iterative"
+    args = option(option(option(COMMON_ARGS, "-d0", "2018-04-27_00:00:00"),
+                         "-d1", "2018-04-30_00:00:00"), "-d2", "2018-05-03_21:00:00")
+    outputs = [f for f in OUTPUTS if f != "rho_grid.dat"] + ["rho_grid_2018-04.dat", "rho_grid_2018-05.dat"]
+    outdir, error = run_model(exe, inputs, f"{case}_monthly", CASES[case] + ["-wro", "2"], THREADS,
+                              common_args=args, outputs=outputs)
+    assert error is None, error
+    april = (outdir / "rho_grid_2018-04.dat").read_bytes()
+    may = (outdir / "rho_grid_2018-05.dat").read_bytes()
+    assert len(april) == 8 * 2 * 26 * 32 * 4, "April must have the 8 steps of 2018-04-30"
+    assert april + may == (run_case(case, THREADS) / "rho_grid.dat").read_bytes()

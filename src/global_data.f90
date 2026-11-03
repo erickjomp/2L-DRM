@@ -106,6 +106,7 @@ MODULE global_data
     character(len=len_path), save     :: filename_paths_xy = "paths_xy.csv"
     character(len=len_path), save     :: filename_rhocolumn_grid = "rho_grid.dat"
     character(len=len_path), save     :: filename_rhocolumn_grid_base = "rho_grid"
+    character(len=3), save            :: outformat = "nc"   ! format of the rho grid: nc or bin
     character(len=len_path), save     :: filename_rhoslabs_grid = "rhoslabs_grid.dat"
     ! character(len=50), save     :: filename_rhoslabs_domain_timeavg = 'rho_slabs_domain_timeavg.csv'
     

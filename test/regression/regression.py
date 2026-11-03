@@ -29,6 +29,7 @@ COMMON_ARGS = [
     "-tdt", "900", "-mtr", "288",
     "-ddt", "3", "-udt", "3",
     "-ver", ".true.", "-wr", ".true.",
+    "-of", "bin",  # rho grid as binary (rho_grid.dat), as the stored references
 ]
 
 # The same target region given as a mask (--target) instead of lists of cells
@@ -98,8 +99,9 @@ def prepare_inputs(workdir):
     (workdir / "input_nc.txt").write_text("".join(f"{f.name}\n" for f in files))
 
 
-def run_model(exe, workdir, outname, extra_args, threads, common_args=COMMON_ARGS):
-    """Run run2LDRM in workdir, writing to workdir/outname. Returns (outdir, error).
+def run_model(exe, workdir, outname, extra_args, threads, common_args=COMMON_ARGS, outputs=OUTPUTS):
+    """Run run2LDRM in workdir, writing to workdir/outname. Returns (outdir, error), with an
+    error if any of outputs is missing.
 
     outname must not exist yet: run2LDRM creates it (and its parents)."""
     outdir = workdir / outname
@@ -108,7 +110,7 @@ def run_model(exe, workdir, outname, extra_args, threads, common_args=COMMON_ARG
     result = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True, text=True)
     outdir.mkdir(parents=True, exist_ok=True)  # for the log, also if the run failed early
     (outdir / "stdout.txt").write_text(result.stdout + result.stderr)
-    missing = [f for f in OUTPUTS if not (outdir / f).is_file()]
+    missing = [f for f in outputs if not (outdir / f).is_file()]
     if result.returncode != 0 or missing:
         log = (result.stdout + result.stderr)[-3000:]
         return outdir, f"run2LDRM failed (exit {result.returncode}, missing: {missing})\n{log}"

@@ -1,6 +1,9 @@
 MODULE subroutines_IO
     use netcdf_c, only: is_netcdf_file, nc_open_read, nc_close_file, nc_dimension_length, &
-                        nc_read_real, nc_read_double, nc_text_attribute, nc_int_attribute
+                        nc_read_real, nc_read_double, nc_text_attribute, nc_int_attribute, &
+                        nc_has_variable, nc_create_file, nc_define_dimension, nc_define_variable, &
+                        nc_put_attribute, nc_end_definitions, nc_write_real, nc_write_double, &
+                        nc_write_int, NC_GLOBAL, NC_FLOAT, NC_DOUBLE, NC_INT
 
     implicit none
 
@@ -504,18 +507,29 @@ contains
 
         call cli%add(switch='--writerhogrid', &
                 switch_ab='-wr',    &
-                help='Write rho column grid, with dimensions (time, regions, ny, nx). &
-                        & Not recommended when having many regions.', &
+                help='Write the grid of rho (column), for each source region and time step, &
+                        &in the format of --outformat. Not recommended when having many regions.', &
                 required=.false.,   &
                 act='store',       &
                 def='.false.',           &
                 error=error_cli)
         if (error_cli/=0) stop   
 
+        call cli%add(switch='--outformat', &
+                switch_ab='-of',    &
+                help='Format of the rho grid (--writerhogrid): nc (NetCDF file rho_grid.nc, the default) or &
+                      &bin (float32 binary file rho_grid.dat, with dimensions (nx, ny, nregions, time)).', &
+                required=.false.,   &
+                act='store',       &
+                def='nc',          &
+                choices='nc,bin',  &
+                error=error_cli)
+        if (error_cli/=0) stop
+
         call cli%add(switch='--writerhogrid_option', &
                 switch_ab='-wro',    &
-                help='Use option 2 to write rho column grid separated by months. &
-                      &Option 1 (default) writes everything to 1 file.', &
+                help='Use option 2 to write the rho grid in one file per month, named by the month &
+                      &(e.g. rho_grid_2018-05.nc). Option 1 (default) writes everything to 1 file.', &
                 required=.false.,   &
                 act='store',       &
                 def='1',           &
@@ -748,6 +762,8 @@ contains
         if (error_cli/=0) stop
         call cli%get(switch='-wro', val=write_rho_grid_option, error=error_cli)
         if (error_cli/=0) stop
+        call cli%get(switch='-of', val=outformat, error=error_cli)
+        if (error_cli/=0) stop
 
 
 
@@ -835,7 +851,8 @@ contains
         file_paths_xy = trim(path_output) // "/" // filename_paths_xy
         ! print *, file_paths_xy
 
-        filename_rhocolumn_grid = trim(prefix_outfiles) // filename_rhocolumn_grid
+        filename_rhocolumn_grid = trim(prefix_outfiles) // trim(filename_rhocolumn_grid_base) // &
+                                  merge(".nc ", ".dat", outformat == "nc")
         file_rhocolumn_grid = trim(path_output) // "/" // filename_rhocolumn_grid
 
         filename_rhoslabs_grid = trim(prefix_outfiles) // filename_rhoslabs_grid
@@ -1787,50 +1804,47 @@ contains
 
 
     subroutine write_rho_grid_sr(rhocolumn, datetime_c)
-        
-        use global_data, only:   t_data_start, t_data_end, nregions, domain_ij, &
+        ! writes the grid of rho of one time step (datetime_c) to the rho grid file (one for the
+        ! whole run, or one per month with --writerhogrid_option 2), as NetCDF or binary (--outformat)
+        use global_data, only:   t_data_end, nregions, domain_ij, &
                                  domsize, bigx, bigy, file_rhocolumn_grid, write_rho_grid_option, &
                                  filename_rhocolumn_grid_base, data_dt, filename_rhocolumn_grid, &
-                                 path_output, prefix_outfiles
+                                 path_output, prefix_outfiles, outformat, datetime0
 
         use, intrinsic :: ieee_arithmetic, only: IEEE_Value, IEEE_QUIET_NAN
-        use, intrinsic :: iso_fortran_env, only: real32
-        use stdlib_datetime, only: datetime_type, timedelta, operator(+), days_in_month
+        use stdlib_datetime, only: datetime_type, operator(-), total_seconds
         implicit none
-        ! real(real32) :: nan
-        real(4)                                           :: nan        
+        real(4)                                           :: nan
         logical, save                                     :: first_time = .true.
-        integer(4), save                                  :: count, i, j, i_reg, k
+        integer                                           :: i, j, i_reg, k, t_data
         real(4), dimension(nregions,domsize),intent(in)   :: rhocolumn
         real(4), dimension(bigx, bigy, nregions)          :: rhocolumn_grid
         type(datetime_type), intent(in)                   :: datetime_c
-        type(datetime_type)                               :: datetime2
-        integer, save                                     :: ndays_month, year, month
-        integer,save                                      :: old_month = 0
+        integer                                           :: year_month
+        integer, save                                     :: old_year_month = 0
+        character(len=7)                                  :: month_str
+        ! NetCDF file: id (-1 if no file is open), ids of rho and time, time steps written
+        integer, save                                     :: ncid = -1, varid_rho, varid_time, i_time
+        real(8)                                           :: hours
 
         nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
-        ! old_month = 0
-        if (write_rho_grid_option == 2) then
-            
-            month = datetime_c%month
-            
-            if (old_month .ne. month) then
-                year = datetime_c%year
-                ndays_month = days_in_month(month, year)
-                datetime2 = datetime_c + timedelta(hours = ndays_month * 24  - data_dt)
+        ! time step of datetime_c (t_data in main), and hours since datetime0
+        hours = total_seconds(datetime_c - datetime0) / 3600.0d0
+        t_data = 1 + nint(hours) / data_dt
 
+        if (write_rho_grid_option == 2) then
+            ! one file per month, named by the month (e.g. rho_grid_2018-05.nc), as the files of
+            ! prepro2LDRM-metdata with --split month: no ":" (not allowed in Windows file names)
+            year_month = 100 * datetime_c%year + datetime_c%month
+            if (year_month /= old_year_month) then
                 first_time = .true.
-                
-                filename_rhocolumn_grid = trim(filename_rhocolumn_grid_base) // "_" // &
-                                         datetime_iso(datetime_c, "T") // "_TO_" // &
-                                         datetime_iso(datetime2, "T") // ".dat"
-                filename_rhocolumn_grid = trim(prefix_outfiles) // filename_rhocolumn_grid
+                write(month_str, '(i4.4,"-",i2.2)') datetime_c%year, datetime_c%month
+                filename_rhocolumn_grid = trim(prefix_outfiles) // trim(filename_rhocolumn_grid_base) // &
+                                          "_" // month_str // merge(".nc ", ".dat", outformat == "nc")
                 file_rhocolumn_grid = trim(path_output) // "/" // filename_rhocolumn_grid
             end if
-
-            old_month = month
+            old_year_month = year_month
         end if
-
 
 
         rhocolumn_grid = nan
@@ -1839,36 +1853,115 @@ contains
                 i=domain_ij(k,1)
                 j=domain_ij(k,2) 
                 rhocolumn_grid(i,j,i_reg) = rhocolumn(i_reg, k)  
-
-                ! if ((count == t_data_start + 30 - 1) .and. i == 51 .and. j == 48) then
-                !     print *, "count = ", count
-                !     print *, "rho = ", rhocolumn_grid(51,48,1)
-                !     print *, "k = ", k
-                ! end if
             end do
         end do
 
 
-
-        if (first_time) then
-            open(120, file = file_rhocolumn_grid, access = "STREAM",&
-                 form = "UNFORMATTED", status = "REPLACE") 
-            write(120) rhocolumn_grid
-            count = t_data_start
-            first_time = .false.
+        if (outformat == "nc") then
+            if (first_time) then
+                if (ncid >= 0) call nc_close_file(ncid)   ! file of the previous month
+                call create_rho_grid_netcdf(trim(file_rhocolumn_grid), ncid, varid_rho, varid_time)
+                i_time = 0
+                first_time = .false.
+            end if
+            i_time = i_time + 1
+            call nc_write_real(ncid, varid_rho, [1, 1, 1, i_time], [bigx, bigy, nregions, 1], rhocolumn_grid)
+            call nc_write_double(ncid, varid_time, [i_time], [1], [hours])
+            if (t_data == t_data_end) then
+                call nc_close_file(ncid)
+                ncid = -1
+            end if
         else
+            if (first_time) then
+                ! (opening unit 120 again for the next month closes the previous file)
+                open(120, file = file_rhocolumn_grid, access = "STREAM",&
+                     form = "UNFORMATTED", status = "REPLACE") 
+                first_time = .false.
+            end if
             write(120) rhocolumn_grid
-            count = count + 1
+            if (t_data == t_data_end) close(120)
         end if
 
+    end subroutine
 
-        if (count == t_data_end) then
-            close(120) 
+
+    ! creates the NetCDF file of the rho grid: rho(time, region, south_north, west_east), time
+    ! (hours since datetime0) and, if the NetCDF inputs have them, XLAT and XLONG
+    subroutine create_rho_grid_netcdf(file, ncid, varid_rho, varid_time)
+        use global_data, only: bigx, bigy, nregions, datetime0, input_netcdf, file_PP, data_dt, &
+                               tracing_dt, max_tracing, solver, option_next_point
+        character(len=*), intent(in) :: file
+        integer, intent(out)         :: ncid, varid_rho, varid_time
+        integer                      :: dim_x, dim_y, dim_region, dim_time, varid_region, &
+                                        varid_lat, varid_lon, ncid_in, i_reg
+        logical                      :: has_lat_lon
+        real(4), allocatable         :: lat(:,:), lon(:,:)
+
+        ! XLAT and XLONG of the first NetCDF input file, if any
+        has_lat_lon = .false.
+        if (input_netcdf) then
+            ncid_in = nc_open_read(trim(file_PP(1)))
+            has_lat_lon = nc_has_variable(ncid_in, 'XLAT') .and. nc_has_variable(ncid_in, 'XLONG')
+            if (has_lat_lon) then
+                allocate(lat(bigx, bigy), lon(bigx, bigy))
+                call nc_read_real(ncid_in, 'XLAT', trim(file_PP(1)), [bigx, bigy], lat)
+                call nc_read_real(ncid_in, 'XLONG', trim(file_PP(1)), [bigx, bigy], lon)
+            end if
+            call nc_close_file(ncid_in)
         end if
 
-        
+        ncid = nc_create_file(file)
+        dim_x = nc_define_dimension(ncid, 'west_east', bigx)
+        dim_y = nc_define_dimension(ncid, 'south_north', bigy)
+        dim_region = nc_define_dimension(ncid, 'region', nregions)
+        dim_time = nc_define_dimension(ncid, 'time', 0)
 
+        varid_time = nc_define_variable(ncid, 'time', NC_DOUBLE, [dim_time])
+        call nc_put_attribute(ncid, varid_time, 'long_name', text='start of the time step')
+        call nc_put_attribute(ncid, varid_time, 'units', text='hours since ' // datetime_iso(datetime0, ' '))
+        call nc_put_attribute(ncid, varid_time, 'calendar', text='standard')
+        call nc_put_attribute(ncid, varid_time, 'comment', text='rho of the precipitation of the time step &
+            &(data_dt) that starts at this time, as the time of the NetCDF inputs')
 
+        varid_region = nc_define_variable(ncid, 'region', NC_INT, [dim_region])
+        call nc_put_attribute(ncid, varid_region, 'long_name', text='source region')
+        call nc_put_attribute(ncid, varid_region, 'description', text='number of the source region, &
+            &as in the map of source regions (--source_regions)')
+
+        if (has_lat_lon) then
+            varid_lat = nc_define_variable(ncid, 'XLAT', NC_FLOAT, [dim_x, dim_y])
+            call nc_put_attribute(ncid, varid_lat, 'long_name', text='latitude')
+            call nc_put_attribute(ncid, varid_lat, 'units', text='degree_north')
+            varid_lon = nc_define_variable(ncid, 'XLONG', NC_FLOAT, [dim_x, dim_y])
+            call nc_put_attribute(ncid, varid_lon, 'long_name', text='longitude')
+            call nc_put_attribute(ncid, varid_lon, 'units', text='degree_east')
+        end if
+
+        ! compressed, one chunk per time step and region: the NaN outside the target region
+        ! take almost no space
+        varid_rho = nc_define_variable(ncid, 'rho', NC_FLOAT, [dim_x, dim_y, dim_region, dim_time], &
+                                       deflate_level=1, chunk_shape=[bigx, bigy, 1, 1])
+        call nc_put_attribute(ncid, varid_rho, 'long_name', text='column rho')
+        call nc_put_attribute(ncid, varid_rho, 'description', text='fraction of the precipitation of the cell &
+            &(column of both slabs) that originates as evapotranspiration from the source region')
+        call nc_put_attribute(ncid, varid_rho, 'units', text='1')
+        call nc_put_attribute(ncid, varid_rho, 'comment', text='NaN outside the target region')
+        if (has_lat_lon) call nc_put_attribute(ncid, varid_rho, 'coordinates', text='XLONG XLAT')
+
+        call nc_put_attribute(ncid, NC_GLOBAL, 'title', text='2L-DRM outputs')
+        call nc_put_attribute(ncid, NC_GLOBAL, 'source', text='run2LDRM, https://github.com/erickjomp/2L-DRM')
+        call nc_put_attribute(ncid, NC_GLOBAL, 'solver', int_value=solver)
+        call nc_put_attribute(ncid, NC_GLOBAL, 'nextpoint', int_value=option_next_point)
+        call nc_put_attribute(ncid, NC_GLOBAL, 'tracing_dt', int_value=tracing_dt)
+        call nc_put_attribute(ncid, NC_GLOBAL, 'max_traxing', int_value=max_tracing)
+        call nc_put_attribute(ncid, NC_GLOBAL, 'data_dt', int_value=data_dt)
+        call nc_end_definitions(ncid)
+
+        call nc_write_int(ncid, varid_region, [1], [nregions], [(i_reg, i_reg = 1, nregions)])
+        if (has_lat_lon) then
+            call nc_write_real(ncid, varid_lat, [1, 1], [bigx, bigy], lat)
+            call nc_write_real(ncid, varid_lon, [1, 1], [bigx, bigy], lon)
+        end if
     end subroutine
 
 

@@ -77,7 +77,7 @@ The repository includes a small example that runs in a few seconds: a coarsened 
 
     run2LDRM --config amz2_coarse.toml
 
-The results are written to `my_example/output/`. The configuration file of the example, `example/amz2_coarse.toml`, is a good starting point for your own runs.
+The results are written to `my_example/output/` (see [Outputs](#outputs)). The configuration file of the example, `example/amz2_coarse.toml`, is a good starting point for your own runs.
 
 ### Configuration file
 
@@ -127,6 +127,12 @@ or together with a configuration file, in which case the command-line arguments 
     run2LDRM --config my_run.toml -po other_output/
 
 
+## Outputs
+`run2LDRM` writes to the output directory (`--pathout`):
+- CSV files with time series of $\rho$ averaged over the target region, for each source region: `rho_column_domain_daily.csv` (column $\rho$, both slabs), `rho_domain_daily.csv` (each slab), `rho_column_domain_timeavg.csv` (averaged over the whole period), and the precipitation over the target region, `precipareal_domain_daily.csv`.
+- With `--writerhogrid .true.`, the grid of column $\rho$ of every target cell, for each source region and time step: by default a NetCDF file, `rho_grid.nc`, with the variable `rho(time, region, south_north, west_east)` (NaN outside the target region), its time, and the latitude and longitude (`XLAT`, `XLONG`) of the NetCDF inputs. With `--outformat bin` it is written as a float32 binary file, `rho_grid.dat`, with dimensions (nx, ny, nregions, time) in Fortran order. `--writerhogrid_option 2` writes one file per month, named by the month (e.g. `rho_grid_2018-05.nc`).
+
+
 ## Preparing input data
 The easiest way to prepare the inputs is the preprocessing program (https://github.com/erickjomp/2L-DRM-preprocessing). It takes standard WRF outputs as input and writes the files needed by 2L-DRM:
 - `prepro2LDRM-metdata` writes the time-varying inputs (PW, U, V, PWflux, PP and ET) in one NetCDF file, given with `--input`. With `--split month` it writes one file per month: give the list of files with `--input` and `--listsfiles .true.`.
@@ -142,7 +148,7 @@ The inputs can also be given as binary files (float32), one per variable, with `
 
 ## Testing (for developers)
 
-Regression tests run the model on a small case (32 x 26 cells, 7 days) coarsened from a 4 km CPM simulation over the Amazon. They compare the outputs with stored reference results, and check that 1 and 4 OpenMP threads, and the NetCDF and binary versions of the inputs, give identical results. They need Python 3 and [pytest](https://pytest.org):
+Regression tests run the model on a small case (32 x 26 cells, 7 days) coarsened from a 4 km CPM simulation over the Amazon. They compare the outputs with stored reference results, and check that 1 and 4 OpenMP threads, and the NetCDF and binary versions of the inputs, give identical results. They need Python 3 and [pytest](https://pytest.org) (and [netCDF4](https://pypi.org/project/netCDF4/) for the test of the NetCDF outputs, which is skipped without it):
 
     fpm build
     python3 -m pytest test/regression --exe $(fpm run run2LDRM --runner echo | tail -1)

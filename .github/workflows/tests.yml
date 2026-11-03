@@ -48,8 +48,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fpm-version: 'v0.13.0'  # release tag, with the "v"
 
-      - name: Install pytest
-        run: python -m pip install pytest
+      # netCDF4: to check the NetCDF outputs
+      - name: Install pytest and netCDF4
+        run: python -m pip install pytest netCDF4
 
       - name: Build
         run: fpm build $FPM_OPTS --compiler ${{ env.FC }} --c-compiler ${{ env.CC }} --cxx-compiler ${{ env.CXX }}
@@ -100,5 +101,5 @@ jobs:
         shell: pwsh
         run: |
           $env:PATH = "${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin;" + $env:PATH
-          python -m pip install pytest
+          python -m pip install pytest netCDF4
           python -m pytest test/regression -v --exe "$env:EXE"
